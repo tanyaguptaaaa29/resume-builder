@@ -9,7 +9,8 @@ const COMPILE_TIMEOUT = 60000; // 60s timeout
 async function compileLatex(texContent, extraFiles = []) {
   try {
     const formData = new FormData();
-    formData.append("filecontents[]", texContent, "document.tex");
+    const texBlob = new Blob([texContent], { type: "text/plain" });
+    formData.append("filecontents[]", texBlob, "document.tex");
     formData.append("filename[]", "document.tex");
     formData.append("engine", "pdflatex");
     formData.append("return", "pdf");

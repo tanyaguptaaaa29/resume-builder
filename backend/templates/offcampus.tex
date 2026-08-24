@@ -1,0 +1,250 @@
+\documentclass[10pt, letterpaper]{article}
+
+% Packages:
+\usepackage[
+    ignoreheadfoot, % set margins without considering header and footer
+    top=0.9 cm, % seperation between body and page edge from the top
+    bottom=0.7 cm, % seperation between body and page edge from the bottom
+    left=1.8 cm, % seperation between body and page edge from the left
+    right=1.8 cm, % seperation between body and page edge from the right
+    footskip=1.0 cm, % seperation between body and footer
+    % showframe % for debugging 
+]{geometry} % for adjusting page geometry
+\usepackage{titlesec} % for customizing section titles
+\usepackage{tabularx} % for making tables with fixed width columns
+\usepackage{array} % tabularx requires this
+\usepackage[dvipsnames]{xcolor} % for coloring text
+\definecolor{primaryColor}{RGB}{0, 79, 144} % define primary color
+\usepackage{enumitem} % for customizing lists
+\usepackage{fontawesome5} % for using icons
+\usepackage{amsmath} % for math
+\usepackage[
+    pdftitle={Resume},
+    pdfauthor={Student},
+    pdfcreator={LaTeX with RenderCV},
+    colorlinks=true,
+    urlcolor=primaryColor
+]{hyperref} % for links, metadata and bookmarks
+\usepackage[pscoord]{eso-pic} % for floating text on the page
+\usepackage{calc} % for calculating lengths
+\usepackage{bookmark} % for bookmarks
+\usepackage{lastpage} % for getting the total number of pages
+\usepackage{changepage} % for one column entries (adjustwidth environment)
+\usepackage{paracol} % for two and three column entries
+\usepackage{ifthen} % for conditional statements
+\usepackage{needspace} % for avoiding page brake right after the section title
+\usepackage{iftex} % check if engine is pdflatex, xetex or luatex
+
+% Ensure that generate pdf is machine readable/ATS parsable:
+\ifPDFTeX
+    \input{glyphtounicode}
+    \pdfgentounicode=1
+    % \usepackage[T1]{fontenc} % this breaks sb2nov
+    \usepackage[utf8]{inputenc}
+    \usepackage{lmodern}
+\fi
+
+% Some settings:
+\AtBeginEnvironment{adjustwidth}{\partopsep0pt} % remove space before adjustwidth environment
+\pagestyle{empty} % no header or footer
+\setcounter{secnumdepth}{0} % no section numbering
+\setlength{\parindent}{0pt} % no indentation
+\setlength{\topskip}{0pt} % no top skip
+\setlength{\columnsep}{0cm} % set column seperation
+\makeatletter
+\let\ps@customFooterStyle\ps@plain % Copy the plain style to customFooterStyle
+\makeatother
+\pagestyle{customFooterStyle}
+
+\titleformat{\section}{\needspace{3\baselineskip}\bfseries\large}{}{0pt}{}[\vspace{1pt}\titlerule]
+
+\titlespacing{\section}{
+    % left space:
+    1pt
+}{
+    % top space:
+    0.05 cm
+}{
+    % bottom space:
+    0.05 cm
+} % section title spacing
+
+\renewcommand\labelitemi{$\circ$} % custom bullet points
+\newenvironment{highlights}{
+    \begin{itemize}[
+        topsep=0.07 cm,
+        parsep=0.07 cm,
+        partopsep=0pt,
+        itemsep=0pt,
+        leftmargin=0.4 cm + 10pt
+    ]
+}{
+    \end{itemize}
+} % new environment for highlights
+
+\newenvironment{highlightsforbulletentries}{
+    \begin{itemize}[
+        topsep=0.10 cm,
+        parsep=0.10 cm,
+        partopsep=0pt,
+        itemsep=0pt,
+        leftmargin=10pt
+    ]
+}{
+    \end{itemize}
+} % new environment for highlights for bullet entries
+
+
+\newenvironment{onecolentry}{
+    \begin{adjustwidth}{
+        0.2 cm + 0.00001 cm
+    }{
+        0.2 cm + 0.00001 cm
+    }
+}{
+    \end{adjustwidth}
+} % new environment for one column entries
+
+\newenvironment{twocolentry}[2][]{
+    \onecolentry
+    \def\secondColumn{#2}
+    \setcolumnwidth{\fill, 4.5 cm}
+    \begin{paracol}{2}
+}{
+    \switchcolumn \raggedleft \secondColumn
+    \end{paracol}
+    \endonecolentry
+} % new environment for two column entries
+
+\newenvironment{header}{
+    \setlength{\topsep}{0pt}\par\kern\topsep\centering\linespread{1.5}
+}{
+    \par\kern\topsep
+} % new environment for the header
+
+\newcommand{\placelastupdatedtext}{% \placetextbox{<horizontal pos>}{<vertical pos>}{<stuff>}
+  \AddToShipoutPictureFG*{% Add <stuff> to current page foreground
+    \put(
+        \LenToUnit{\paperwidth-2 cm-0.2 cm+0.05cm},
+        \LenToUnit{\paperheight-1.0 cm})
+  }%
+}%
+
+% save the original href command in a new command:
+\let\hrefWithoutArrow\href
+
+% new command for external links:
+\renewcommand{\href}[2]{\hrefWithoutArrow{#1}{\ifthenelse{\equal{#2}{}}{ }{#2 }\raisebox{.15ex}{\footnotesize \faExternalLink*}}}
+
+
+\begin{document}
+    \newcommand{\AND}{\unskip
+        \cleaders\copy\ANDbox\hskip\wd\ANDbox
+        \ignorespaces
+    }
+    \newsavebox\ANDbox
+    \sbox\ANDbox{}
+
+   
+    \begin{header}
+        \textbf{\fontsize{24 pt}{24 pt}\selectfont <<FullName>>}
+
+        \vspace{0.1 cm}
+
+        \normalsize
+\mbox{
+\hrefWithoutArrow{<<LinkedIn>>}{
+\color{black}\small\faLinkedinIn\hspace{0.15cm}LinkedIn
+}
+\kern 0.6cm
+\hrefWithoutArrow{mailto:<<Email>>}{
+\color{black}\small\faEnvelope[regular]\hspace{0.15cm}<<Email>>
+}
+\kern 0.6cm
+\hrefWithoutArrow{tel:<<Phone>>}{
+\color{black}\small\faPhone*\hspace{0.15cm}<<Phone>>
+}
+\kern 0.6cm
+\hrefWithoutArrow{<<GitHub>>}{
+\color{black}\small\faGithub\hspace{0.15cm}GitHub
+}
+}
+    \end{header}
+
+    \section{Education}
+% --- EXAMPLE ENTRY ---
+%        \begin{twocolentry}{
+%        \textit{2023 – 2027}}
+%            \textbf{Netaji Subhas University of Technology}
+%            \textit{B.Tech. Electronics \& Communications Engineering (CGPA: 8.38)}
+%        \end{twocolentry}
+%        \vspace{0.05 cm}
+% --- END EXAMPLE ---
+<<EducationEntries>>
+
+    \section{Experience}
+% --- EXAMPLE ENTRY ---
+%        \begin{twocolentry}{
+%        \textit{May 2026 – July 2026 }}
+%            \textbf{Google}
+%            \textit{Intern | }
+%            \vspace{0.2 cm}
+%            \href{https://github.com/SuryanshKS/protocol-mapper}{\underline{Demo Code}}
+%        \end{twocolentry}
+%        \begin{onecolentry}
+%            \begin{highlights}
+%                \item Implemented recursive AST traversal algorithms.
+%            \end{highlights}
+%        \end{onecolentry}
+% --- END EXAMPLE ---
+<<ExperienceEntries>>
+
+    
+    \section{Projects}
+    \vspace{0.05 cm}
+% --- EXAMPLE ENTRY ---
+%        \textbf{Wandrly - Travel Smarter, Together}\hfill
+%        \vspace{0.2 cm}
+%\href{https://github.com/SuryanshKS/Wandrly}{\underline{Source Code}}
+%|
+%\href{https://wandrly-alpha.vercel.app/}{\underline{Live Link}}
+%
+%        \begin{onecolentry}
+%            \begin{highlights}
+%                \item Architected a scalable RESTful API backend.
+%            \end{highlights}
+%        \end{onecolentry}
+% --- END EXAMPLE ---
+<<ProjectsEntries>>
+
+       
+\section{Technical Skills}
+\vspace{0.2 cm}
+    \begin{highlights}
+% --- EXAMPLE ENTRY ---
+%        \item Languages: C/C++, JavaScript, Python, SQL
+% --- END EXAMPLE ---
+<<SkillsEntries>>
+    \end{highlights}
+
+ \section{Academic Achievements}        
+\vspace{0.1 cm}
+\begin{onecolentry}
+\begin{highlights}
+% --- EXAMPLE ENTRY ---
+%    \item Represented my college at the Smart India Hackathon (SIH) 2025 Finals in Nagpur
+% --- END EXAMPLE ---
+<<AchievementsEntries>>
+\end{highlights}
+\end{onecolentry}
+
+\section{Extra-Curricular}
+    \vspace{0.10 cm}
+    \begin{highlights}
+% --- EXAMPLE ENTRY ---
+%         \item Content Writer | The Debugging Society, NSUT
+% --- END EXAMPLE ---
+<<ResponsibilityEntries>>
+    \end{highlights}
+    
+\end{document}

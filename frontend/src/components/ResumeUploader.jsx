@@ -16,7 +16,7 @@ export default function ResumeUploader() {
     setFileName(file.name);
     dispatch({
       type: 'SET_LOADING',
-      payload: { isLoading: true, message: 'Extracting resume data via Gemma AI...' },
+      payload: { isLoading: true, message: 'Extracting and optimizing data for ATS via AI...' },
     });
     dispatch({ type: 'SET_ERROR', payload: null });
 

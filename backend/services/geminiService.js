@@ -12,7 +12,7 @@ const ai = new GoogleGenAI({
  */
 async function extractResumeData(resumeText) {
   const response = await ai.models.generateContent({
-    model: "gemma-4-26b-a4b-it",
+    model: "gemini-3.5-flash-lite",
     contents: `You are a resume data extraction expert. Extract ALL structured information from the following resume text and return it as a valid JSON object.
 
 The JSON must follow this exact schema:
@@ -80,6 +80,8 @@ IMPORTANT:
 - Return ONLY valid JSON, no markdown code blocks, no explanations.
 - If a section is not present in the resume, omit it or use an empty array.
 - Ensure all bullet points are extracted verbatim from the resume.
+- EXTRACTION OF URLS: The text may contain links formatted as LaTeX commands (e.g. \href{URL}{Text}). If a JSON field specifically expects a URL (like linkedin, github, portfolio, or a project link), extract ONLY the raw URL string.
+- IN-TEXT LINKS: If an \href command appears in the middle of a bullet point, preserve the entire \href{URL}{Text} tag exactly as it is within the bullet point.
 
 Resume text:
 ${resumeText}`,
@@ -97,7 +99,7 @@ async function chatWithUser(messages) {
     .join("\n");
 
   const response = await ai.models.generateContent({
-    model: "gemma-4-26b-a4b-it",
+    model: "gemini-3.5-flash-lite",
     contents: `You are a friendly resume building assistant for NSUT students. You are collecting information to build their resume.
 
 CONVERSATION FLOW — Ask ONE question at a time in this order:
@@ -146,7 +148,7 @@ async function generateLatex(resumeData, template) {
     console.warn(`Could not read template ${template}.tex:`, error);
   }
 
-  const templateInstructions = templateContent 
+  const templateInstructions = templateContent
     ? `You MUST use the exact LaTeX template structure provided below. 
 Fill in the placeholders (like <<FullName>>, <<EducationEntries>>) with the data provided.
 Do NOT change the documentclass, margins, spacing, or heading styles. 
@@ -167,7 +169,7 @@ STYLE: Professional corporate format, ATS-optimized.
 - Experience section should be most prominent with quantified achievements`);
 
   const response = await ai.models.generateContent({
-    model: "gemini-3.6-flash",
+    model: "gemini-3.5-flash-lite",
     contents: `You are an expert LaTeX resume generator. Generate a COMPLETE, COMPILABLE LaTeX document for a resume using the data provided.
 
 ${templateInstructions}
@@ -183,6 +185,7 @@ LATEX REQUIREMENTS (if not using a strict template above):
 COMMON LATEX RULES:
 1. All special LaTeX characters MUST be properly escaped (%, &, $, #, _, {, }, ~, ^)
 2. Output ONLY the complete .tex file content, no markdown blocks.
+3. CRITICAL: The generated resume MUST fit on exactly one page. Truncate, summarize, or omit the least important bullet points if necessary to ensure the content does not overflow to a second page.
 
 RESUME DATA (JSON):
 ${resumeData}
@@ -198,7 +201,7 @@ Generate the complete .tex file now:`,
  */
 async function enhanceContent(resumeData, section) {
   const response = await ai.models.generateContent({
-    model: "gemini-3.6-flash",
+    model: "gemini-3.5-flash-lite",
     contents: `You are a professional resume writer specializing in ATS-optimized content for tech roles.
 
 Enhance the ${section} section of this resume data. For each bullet point:
@@ -218,9 +221,42 @@ Return ONLY valid JSON:`,
   return response.text || "{}";
 }
 
+/**
+ * Phase 1.5: ATS Optimization Layer (Tech/SDE focus)
+ */
+async function optimizeResumeForATS(resumeDataStr) {
+  const response = await ai.models.generateContent({
+    model: "gemini-3.5-flash-lite",
+    contents: `You are an elite Tech/SDE Resume Writer and ATS Optimization Expert.
+Your job is to rewrite the provided resume JSON to achieve the HIGHEST POSSIBLE ATS SCORE for Software Engineering and Tech roles.
+
+OPTIMIZATION RULES:
+1. REWRITE ALL BULLET POINTS in "experience", "projects", and "positionsOfResponsibility".
+2. Use the XYZ formula: "Accomplished [X] as measured by [Y], by doing [Z]".
+3. Start every bullet point with a strong, high-impact action verb (e.g., Architected, Engineered, Designed, Developed, Spearheaded, Optimized).
+4. PRESERVE THE EXACT NUMBER OF BULLETS: Do not merge, combine, or summarize bullet points. If a project had 3 bullets in the original JSON, it MUST have exactly 3 bullets in the output. Just rephrase each individual bullet to be stronger.
+5. NEVER INVENT OR ADD ARBITRARY NUMBERS OR METRICS. You may rephrase and improve the points, but if the user did not provide specific numbers, DO NOT make them up. Do not generate random points just because they sound good.
+6. Emphasize Technical Skills: Naturally weave in languages, frameworks, and cloud technologies into the bullet points.
+6. Keep bullet points concise (1-2 lines) but extremely dense with impact and keywords.
+7. CRITICAL: Do NOT artificially bloat the resume or invent details out of thin air. Ensure every bullet point strictly follows the XYZ ATS format wherever possible.
+8. DO NOT invent entirely new fake jobs or projects, just elevate the existing ones to sound like an elite top-tier candidate.
+9. PRESERVE LATEX LINKS: The JSON might contain LaTeX links like \\href{https://...}{Text} inside bullet points. You MUST preserve these exact tags when rephrasing bullet points. Do not break or remove them.
+
+Return the COMPLETE, fully-optimized JSON matching the exact same schema.
+
+RESUME DATA:
+${resumeDataStr}
+
+Return ONLY valid JSON:`,
+  });
+
+  return response.text || "{}";
+}
+
 module.exports = {
   extractResumeData,
   chatWithUser,
   generateLatex,
   enhanceContent,
+  optimizeResumeForATS,
 };

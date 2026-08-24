@@ -6,14 +6,13 @@
 const TEXLIVE_URL = "https://texlive.net/cgi-bin/latexcgi";
 const COMPILE_TIMEOUT = 60000; // 60s timeout
 
-async function compileLatex(texContent) {
+async function compileLatex(texContent, extraFiles = []) {
   try {
     const formData = new FormData();
-    const blob = new Blob([texContent], { type: 'text/plain' });
-    formData.append('filecontents[]', blob, 'document.tex');
-    formData.append('filename[]', 'document.tex');
-    formData.append('engine', 'pdflatex');
-    formData.append('return', 'pdf');
+    formData.append("filecontents[]", texContent, "document.tex");
+    formData.append("filename[]", "document.tex");
+    formData.append("engine", "pdflatex");
+    formData.append("return", "pdf");
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), COMPILE_TIMEOUT);
@@ -40,6 +39,7 @@ async function compileLatex(texContent) {
         const errorText = await response.text();
         const fs = require('fs');
         fs.writeFileSync('last_failed.tex', texContent);
+        fs.writeFileSync('last_failed.log', errorText);
         return {
           success: false,
           error: `LaTeX Compilation failed with log:\n${errorText.substring(0, 1000)}`,

@@ -266,7 +266,9 @@ async function generateLatexResume(req, res) {
 
     // Compile to PDF
     console.log("⏳ Step 2: Compiling LaTeX to PDF via Latex.Online...");
-    const result = await compileLatex(texContent);
+    
+    // We do NOT send extraFiles to latexCompilerService because the remote compiler corrupts binary files
+    const result = await compileLatex(texContent, []);
 
     if (!result.success || !result.pdf) {
       console.log("❌ Error: Failed to compile LaTeX to PDF");
@@ -279,13 +281,62 @@ async function generateLatexResume(req, res) {
     }
 
     console.log("✅ Step 2 Complete: PDF compiled successfully.");
-    console.log(`- PDF Size: ${result.pdf.length} bytes`);
+    
+    let finalPdfBuffer = result.pdf;
+    
+    if (template === "college") {
+      try {
+        console.log("⏳ Step 3: Stamping NSUT Logo using pdf-lib...");
+        const fs = require("fs");
+        const path = require("path");
+        const { PDFDocument } = require("pdf-lib");
+        
+        const logoPath = path.join(__dirname, "../assets/NSUT_logo.png");
+        if (fs.existsSync(logoPath)) {
+          const logoImageBytes = fs.readFileSync(logoPath);
+          const pdfDoc = await PDFDocument.load(finalPdfBuffer);
+          const logoImage = await pdfDoc.embedPng(logoImageBytes);
+          
+          const pages = pdfDoc.getPages();
+          const firstPage = pages[0];
+          
+          // Geometry settings from college.tex: 
+          // margin=0.11in, image height=0.7in
+          // In pdf-lib, 72 points = 1 inch, origin is bottom-left
+          const { width, height } = firstPage.getSize();
+          
+          const marginPts = 0.11 * 72;
+          const imgHeightPts = 0.7 * 72;
+          const aspectRatio = logoImage.width / logoImage.height;
+          const imgWidthPts = imgHeightPts * aspectRatio;
+          
+          // Calculate X and Y
+          const x = marginPts;
+          const y = height - marginPts - imgHeightPts;
+          
+          firstPage.drawImage(logoImage, {
+            x: x,
+            y: y,
+            width: imgWidthPts,
+            height: imgHeightPts,
+          });
+          
+          const stampedPdfBytes = await pdfDoc.save();
+          finalPdfBuffer = Buffer.from(stampedPdfBytes);
+          console.log("✅ Step 3 Complete: Logo stamped successfully.");
+        }
+      } catch (err) {
+        console.error("❌ Failed to stamp NSUT_logo.png:", err);
+      }
+    }
+
+    console.log(`- PDF Size: ${finalPdfBuffer.length} bytes`);
     
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", 'attachment; filename="resume.pdf"');
     
     console.log("🚀 Sending PDF back to client...");
-    return res.send(result.pdf);
+    return res.send(finalPdfBuffer);
   } catch (error) {
     console.error("❌ generateLatexResume Controller Error:", error);
     return res.status(500).json({ success: false, error: error.message });

@@ -5,6 +5,7 @@ const {
   generateLatex,
   enhanceContent,
   optimizeResumeForATS,
+  truncateLatex,
 } = require("../services/geminiService");
 const { compileLatex } = require("../services/latexCompilerService");
 
@@ -117,132 +118,6 @@ async function chat(req, res) {
   }
 }
 
-/**
- * Helper: Trims resume data to strictly fit on one page using a line estimation heuristic.
- */
-function trimResumeDataToFitOnePage(data) {
-  const MAX_LINES = 75; // Standard 11pt font on 0.11in margins holds ~75 lines
-  const CHARS_PER_LINE = 115;
-  
-  const estimateLines = (d) => {
-    let lines = 5; // Header
-    
-    if (d.education && d.education.length > 0) {
-      lines += 2; // Section header
-      lines += d.education.length * 2;
-    }
-    if (d.experience && d.experience.length > 0) {
-      lines += 2;
-      d.experience.forEach(exp => {
-        lines += 2;
-        if (exp.bullets) {
-          exp.bullets.forEach(b => {
-            lines += Math.max(1, Math.ceil(b.length / CHARS_PER_LINE));
-          });
-        }
-      });
-    }
-    if (d.projects && d.projects.length > 0) {
-      lines += 2;
-      d.projects.forEach(proj => {
-        lines += 2;
-        if (proj.bullets) {
-          proj.bullets.forEach(b => {
-            lines += Math.max(1, Math.ceil(b.length / CHARS_PER_LINE));
-          });
-        }
-      });
-    }
-    if (d.skills) {
-      lines += 2;
-      Object.values(d.skills).forEach(arr => {
-        if (arr && arr.length > 0) lines += 1;
-      });
-    }
-    if (d.achievements && d.achievements.length > 0) {
-      lines += 2;
-      d.achievements.forEach(a => {
-        const text = (a.title || "") + " " + (a.description || "");
-        lines += Math.max(1, Math.ceil(text.length / CHARS_PER_LINE));
-      });
-    }
-    if (d.positionsOfResponsibility && d.positionsOfResponsibility.length > 0) {
-      lines += 2;
-      d.positionsOfResponsibility.forEach(por => {
-        lines += 1;
-        if (por.bullets) {
-          por.bullets.forEach(b => {
-            lines += Math.max(1, Math.ceil(b.length / CHARS_PER_LINE));
-          });
-        }
-      });
-    }
-    if (d.certifications && d.certifications.length > 0) {
-      lines += 2;
-      d.certifications.forEach(c => lines += 1);
-    }
-    return lines;
-  };
-
-  let currentLines = estimateLines(data);
-  let iterationCount = 0;
-  
-  while (currentLines > MAX_LINES && iterationCount < 50) {
-    let removedSomething = false;
-    
-    // 1. Try trimming the last project bullet if it has > 1 bullets
-    if (data.projects && data.projects.length > 0) {
-      for (let i = data.projects.length - 1; i >= 0; i--) {
-        if (data.projects[i].bullets && data.projects[i].bullets.length > 1) {
-          data.projects[i].bullets.pop();
-          removedSomething = true;
-          break;
-        }
-      }
-    }
-    
-    // 2. Try trimming an experience bullet
-    if (!removedSomething && data.experience && data.experience.length > 0) {
-      for (let i = data.experience.length - 1; i >= 0; i--) {
-        if (data.experience[i].bullets && data.experience[i].bullets.length > 1) {
-          data.experience[i].bullets.pop();
-          removedSomething = true;
-          break;
-        }
-      }
-    }
-
-    // 3. Try trimming a POR bullet
-    if (!removedSomething && data.positionsOfResponsibility && data.positionsOfResponsibility.length > 0) {
-       for (let i = data.positionsOfResponsibility.length - 1; i >= 0; i--) {
-        if (data.positionsOfResponsibility[i].bullets && data.positionsOfResponsibility[i].bullets.length > 0) {
-          data.positionsOfResponsibility[i].bullets.pop();
-          removedSomething = true;
-          break;
-        }
-      }
-    }
-
-    // 4. Try completely removing the oldest project if still stuck
-    if (!removedSomething && data.projects && data.projects.length > 1) {
-      data.projects.pop();
-      removedSomething = true;
-    }
-
-    // 5. Try completely removing the oldest experience
-    if (!removedSomething && data.experience && data.experience.length > 1) {
-      data.experience.pop();
-      removedSomething = true;
-    }
-    
-    if (!removedSomething) break; 
-    
-    currentLines = estimateLines(data);
-    iterationCount++;
-  }
-  
-  return data;
-}
 
 /**
  * Controller: Generate LaTeX via Gemini 2.5 Flash → Compile to PDF via LaTeX.Online
@@ -264,45 +139,63 @@ async function generateLatexResume(req, res) {
       return res.status(400).json({ success: false, error: "Valid template required (college or offcampus)" });
     }
 
-    // Trim data to fit one page precisely before sending to LaTeX
+    // Do not pre-trim data; let the loop handle overflow
     const parsedData = typeof data === "string" ? JSON.parse(data) : data;
-    const trimmedData = trimResumeDataToFitOnePage(parsedData);
-    const resumeJson = JSON.stringify(trimmedData);
+    const resumeJson = JSON.stringify(parsedData);
     
     console.log("⏳ Step 1: Calling Gemini to generate LaTeX...");
     let texContent = await generateLatex(resumeJson, template);
     console.log("✅ Step 1 Complete: Gemini generated LaTeX successfully.");
     console.log(`- Generated LaTeX length: ${texContent.length} characters`);
 
-    texContent = texContent.trim();
-    if (texContent.startsWith("```")) {
-      texContent = texContent.replace(/^```(?:latex|tex)?\n?/, "").replace(/\n?```$/, "");
-      console.log("- Removed markdown code block formatting.");
+    // Iterative Compilation and Truncation Loop
+    const { PDFDocument } = require("pdf-lib");
+    let finalPdfBuffer = null;
+    let isSinglePage = false;
+    let iterations = 0;
+    const MAX_ITERATIONS = 3;
+
+    while (!isSinglePage && iterations < MAX_ITERATIONS) {
+      iterations++;
+      console.log(`⏳ Step 2 (Iteration ${iterations}): Cleaning and Compiling LaTeX...`);
+
+      texContent = texContent.trim();
+      if (texContent.startsWith("```")) {
+        texContent = texContent.replace(/^```(?:latex|tex)?\n?/, "").replace(/\n?```$/, "");
+      }
+      texContent = texContent.replace(/\\(begin|end)\{([a-zA-Z]+)[\s]*$/gm, "\\$1{$2}");
+
+      const result = await compileLatex(texContent, []);
+
+      if (!result.success || !result.pdf) {
+        console.log("❌ Error: Failed to compile LaTeX to PDF");
+        console.log(`- Reason: ${result.error}`);
+        return res.status(500).json({
+          success: false,
+          error: result.error || "Failed to compile LaTeX to PDF",
+          texContent,
+        });
+      }
+
+      finalPdfBuffer = result.pdf;
+      
+      const pdfDoc = await PDFDocument.load(finalPdfBuffer);
+      const pageCount = pdfDoc.getPageCount();
+
+      if (pageCount === 1) {
+        isSinglePage = true;
+        console.log("✅ PDF fits on 1 page perfectly.");
+        break;
+      } else {
+        console.log(`❌ PDF is ${pageCount} pages (Overflow).`);
+        if (iterations < MAX_ITERATIONS) {
+          console.log("⏳ Triggering AI truncation layer to remove least significant points...");
+          texContent = await truncateLatex(texContent);
+        } else {
+          console.log("⚠️ Reached max iterations. Proceeding with multi-page PDF.");
+        }
+      }
     }
-
-    // Auto-fix common Gemini hallucination where it forgets the closing brace
-    texContent = texContent.replace(/\\(begin|end)\{([a-zA-Z]+)[\s]*$/gm, "\\$1{$2}");
-    console.log("- Applied LaTeX syntax auto-fixes.");
-
-    // Compile to PDF
-    console.log("⏳ Step 2: Compiling LaTeX to PDF via Latex.Online...");
-    
-    // We do NOT send extraFiles to latexCompilerService because the remote compiler corrupts binary files
-    const result = await compileLatex(texContent, []);
-
-    if (!result.success || !result.pdf) {
-      console.log("❌ Error: Failed to compile LaTeX to PDF");
-      console.log(`- Reason: ${result.error}`);
-      return res.status(500).json({
-        success: false,
-        error: result.error || "Failed to compile LaTeX to PDF",
-        texContent,
-      });
-    }
-
-    console.log("✅ Step 2 Complete: PDF compiled successfully.");
-    
-    let finalPdfBuffer = result.pdf;
     
     if (template === "college") {
       try {

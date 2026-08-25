@@ -35,11 +35,10 @@ export default function InputMethodSelector() {
           className={`selector-card ${state.inputMethod === 'chat' ? 'selected' : ''}`}
           onClick={() => select('chat')}
         >
-          <div className="selector-icon">💬</div>
-          <h3>Tell Us About Yourself</h3>
+          <div className="selector-icon">📝</div>
+          <h3>Fill the Form</h3>
           <p>
-            No resume yet? Our AI assistant will guide you through each section
-            step by step.
+            No resume yet? Manually fill out a structured form with your details.
           </p>
         </div>
       </div>

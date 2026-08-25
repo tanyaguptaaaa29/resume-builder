@@ -8,6 +8,8 @@ export const PersonalInfoSchema = z.object({
   linkedin: z.string().optional(),
   github: z.string().optional(),
   portfolio: z.string().optional(),
+  leetcode: z.string().optional(),
+  codeforces: z.string().optional(),
   location: z.string().optional(),
 });
 

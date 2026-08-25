@@ -5,7 +5,7 @@ import StepIndicator from './components/StepIndicator';
 import TemplateSelector from './components/TemplateSelector';
 import InputMethodSelector from './components/InputMethodSelector';
 import ResumeUploader from './components/ResumeUploader';
-import GuidedChat from './components/GuidedChat';
+import ManualForm from './components/ManualForm';
 import DataReview from './components/DataReview';
 import PreviewDownload from './components/PreviewDownload';
 
@@ -21,7 +21,7 @@ function BuilderFlow({ onGoHome }) {
       case 3:
         if (state.resumeData) return <DataReview />;
         if (state.inputMethod === 'upload') return <ResumeUploader />;
-        if (state.inputMethod === 'chat') return <GuidedChat />;
+        if (state.inputMethod === 'chat') return <ManualForm />;
         return <InputMethodSelector />;
       case 4:
         return <PreviewDownload />;

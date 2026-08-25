@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useBuilder } from "@/context/BuilderContext";
-import type { ChatMessage, ResumeData } from "@/lib/schemas/resume";
+import type { ResumeData } from "@/lib/schemas/resume";
+import ManualForm from "./ManualForm";
 
 // ============================================================
 // STEP INDICATOR
@@ -144,11 +145,10 @@ function InputMethodSelector() {
           tabIndex={0}
           onKeyDown={(e) => e.key === "Enter" && select("chat")}
         >
-          <div className="selector-icon">💬</div>
-          <h3>Tell Us About Yourself</h3>
+          <div className="selector-icon">📝</div>
+          <h3>Fill the Form</h3>
           <p>
-            No resume yet? Our AI assistant will guide you through each section
-            step by step.
+            No resume yet? Manually fill out a structured form with your details.
           </p>
         </div>
       </div>
@@ -257,159 +257,6 @@ function ResumeUploader() {
         </div>
         <h4>{fileName || "Drop your resume here"}</h4>
         <p>{fileName ? "File ready — processing..." : "PDF only, max 5MB"}</p>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// STEP 3B: GUIDED CHAT
-// ============================================================
-function GuidedChat() {
-  const { state, dispatch } = useBuilder();
-  const [input, setInput] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const hasInitialized = useRef(false);
-
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, []);
-
-  // Send initial greeting
-  const initChat = useCallback(async () => {
-    if (hasInitialized.current) return;
-    hasInitialized.current = true;
-
-    setIsTyping(true);
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: [] }),
-      });
-      const result = await res.json();
-      if (result.success) {
-        dispatch({
-          type: "ADD_CHAT_MESSAGE",
-          payload: { role: "assistant", content: result.reply },
-        });
-      }
-    } catch {
-      dispatch({
-        type: "ADD_CHAT_MESSAGE",
-        payload: {
-          role: "assistant",
-          content: "Hi! 👋 I'm your resume building assistant. Let's start with your full name — what should I put at the top of your resume?",
-        },
-      });
-    }
-    setIsTyping(false);
-  }, [dispatch]);
-
-  // Initialize on mount
-  useState(() => {
-    initChat();
-  });
-
-  const sendMessage = async () => {
-    if (!input.trim() || isTyping) return;
-
-    const userMessage: ChatMessage = { role: "user", content: input.trim() };
-    const updatedMessages = [...state.chatHistory, userMessage];
-
-    dispatch({ type: "ADD_CHAT_MESSAGE", payload: userMessage });
-    setInput("");
-    setIsTyping(true);
-
-    setTimeout(scrollToBottom, 100);
-
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: updatedMessages }),
-      });
-
-      const result = await res.json();
-
-      if (result.success) {
-        dispatch({
-          type: "ADD_CHAT_MESSAGE",
-          payload: { role: "assistant", content: result.reply },
-        });
-
-        if (result.isComplete && result.data) {
-          dispatch({ type: "SET_RESUME_DATA", payload: result.data });
-          setTimeout(() => dispatch({ type: "NEXT_STEP" }), 1500);
-        }
-      }
-    } catch {
-      dispatch({
-        type: "ADD_CHAT_MESSAGE",
-        payload: {
-          role: "assistant",
-          content: "Sorry, I encountered an error. Could you try again?",
-        },
-      });
-    }
-
-    setIsTyping(false);
-    setTimeout(scrollToBottom, 100);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
-
-  return (
-    <div className="animate-fade-in-up" style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
-      <h2 className="builder-step-title">
-        Tell Us About <span className="text-gradient">Yourself</span>
-      </h2>
-      <p className="builder-step-subtitle">
-        Chat with our AI assistant — we&apos;ll guide you through each section.
-      </p>
-
-      <div className="chat-container">
-        <div className="chat-messages">
-          {state.chatHistory.map((msg, i) => (
-            <div key={i} className={`chat-bubble ${msg.role}`}>
-              {msg.content}
-            </div>
-          ))}
-          {isTyping && (
-            <div className="typing-indicator">
-              <div className="typing-dot" />
-              <div className="typing-dot" />
-              <div className="typing-dot" />
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-
-        <div className="chat-input-area">
-          <input
-            id="chat-input"
-            className="input"
-            type="text"
-            placeholder="Type your answer..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={isTyping}
-          />
-          <button
-            className="btn btn-primary"
-            onClick={sendMessage}
-            disabled={!input.trim() || isTyping}
-          >
-            Send
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -771,7 +618,7 @@ export default function BuilderPage() {
       case 3:
         if (state.resumeData) return <DataReview />;
         if (state.inputMethod === "upload") return <ResumeUploader />;
-        if (state.inputMethod === "chat") return <GuidedChat />;
+        if (state.inputMethod === "chat") return <ManualForm />;
         return <InputMethodSelector />;
       case 4:
         return <PreviewDownload />;

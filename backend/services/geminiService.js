@@ -24,6 +24,8 @@ The JSON must follow this exact schema:
     "linkedin": "string (optional)",
     "github": "string (optional)",
     "portfolio": "string (optional)",
+    "leetcode": "string (optional)",
+    "codeforces": "string (optional)",
     "location": "string (optional)"
   },
   "education": [{
@@ -150,9 +152,10 @@ async function generateLatex(resumeData, template) {
 
   const templateInstructions = templateContent
     ? `You MUST use the exact LaTeX template structure provided below. 
-Fill in the placeholders (like <<FullName>>, <<EducationEntries>>) with the data provided.
+Fill in the placeholders (like <<FullName>>, <<EducationEntries>>, <<LeetCode>>, <<CodeForces>>) with the data provided.
 Do NOT change the documentclass, margins, spacing, or heading styles. 
 Replace the example entries with actual data, repeating the formatting as necessary.
+CRITICAL: If an optional field like <<LeetCode>> or <<CodeForces>> is not present in the provided JSON data, you MUST cleanly remove its placeholder along with any preceding or trailing separators (like '|' or '\\,') so the header looks natural.
 
 TEMPLATE:
 ${templateContent}`
@@ -185,7 +188,7 @@ LATEX REQUIREMENTS (if not using a strict template above):
 COMMON LATEX RULES:
 1. All special LaTeX characters MUST be properly escaped (%, &, $, #, _, {, }, ~, ^)
 2. Output ONLY the complete .tex file content, no markdown blocks.
-3. CRITICAL: The generated resume MUST fit on exactly one page. Truncate, summarize, or omit the least important bullet points if necessary to ensure the content does not overflow to a second page.
+3. CRITICAL: Maintain as much of the provided information as possible while writing the LaTeX code. Do not exaggerate or bloat the content, but make sure the user's provided points are kept and rephrased naturally. Do NOT arbitrarily drop bullet points.
 
 RESUME DATA (JSON):
 ${resumeData}
@@ -206,7 +209,7 @@ async function enhanceContent(resumeData, section) {
 
 Enhance the ${section} section of this resume data. For each bullet point:
 1. Start with a strong action verb (Developed, Implemented, Architected, Optimized, etc.)
-2. Include quantified achievements where possible (%, numbers, scale)
+2. CRITICAL: NEVER remove or dilute any quantified achievements (%, numbers, scale) already provided by the user. If they wrote "saved 10 hours", keep the EXACT numbers.
 3. Mention specific technologies used
 4. Keep each bullet point to 1-2 lines maximum
 
@@ -235,12 +238,13 @@ OPTIMIZATION RULES:
 2. Use the XYZ formula: "Accomplished [X] as measured by [Y], by doing [Z]".
 3. Start every bullet point with a strong, high-impact action verb (e.g., Architected, Engineered, Designed, Developed, Spearheaded, Optimized).
 4. PRESERVE THE EXACT NUMBER OF BULLETS: Do not merge, combine, or summarize bullet points. If a project had 3 bullets in the original JSON, it MUST have exactly 3 bullets in the output. Just rephrase each individual bullet to be stronger.
-5. NEVER INVENT OR ADD ARBITRARY NUMBERS OR METRICS. You may rephrase and improve the points, but if the user did not provide specific numbers, DO NOT make them up. Do not generate random points just because they sound good.
-6. Emphasize Technical Skills: Naturally weave in languages, frameworks, and cloud technologies into the bullet points.
-6. Keep bullet points concise (1-2 lines) but extremely dense with impact and keywords.
-7. CRITICAL: Do NOT artificially bloat the resume or invent details out of thin air. Ensure every bullet point strictly follows the XYZ ATS format wherever possible.
-8. DO NOT invent entirely new fake jobs or projects, just elevate the existing ones to sound like an elite top-tier candidate.
-9. PRESERVE LATEX LINKS: The JSON might contain LaTeX links like \\href{https://...}{Text} inside bullet points. You MUST preserve these exact tags when rephrasing bullet points. Do not break or remove them.
+5. NEVER INVENT OR ADD ARBITRARY NUMBERS OR METRICS if they were not provided.
+6. CRITICAL: NEVER REMOVE OR DILUTE ANY NUMBERS, METRICS, OR IMPACT PERCENTAGES PROVIDED BY THE USER. If the user wrote "saving 10 human hours", "reduced load times by 80%", "increased by 20%", etc., you MUST prominently feature those EXACT numbers in your rewritten bullet point to highlight their impact. Do not generalize them into "streamlined" or "accelerated".
+7. Emphasize Technical Skills: Naturally weave in languages, frameworks, and cloud technologies into the bullet points.
+8. Keep bullet points concise (1-2 lines) but extremely dense with impact and keywords.
+9. CRITICAL: Do NOT artificially bloat the resume or invent details out of thin air. Ensure every bullet point strictly follows the XYZ ATS format wherever possible.
+10. DO NOT invent entirely new fake jobs or projects, just elevate the existing ones to sound like an elite top-tier candidate.
+11. PRESERVE LATEX LINKS: The JSON might contain LaTeX links like \\href{https://...}{Text} inside bullet points. You MUST preserve these exact tags when rephrasing bullet points. Do not break or remove them.
 
 Return the COMPLETE, fully-optimized JSON matching the exact same schema.
 
@@ -253,10 +257,35 @@ Return ONLY valid JSON:`,
   return response.text || "{}";
 }
 
+/**
+ * Truncates existing LaTeX by removing the 1-2 least significant bullet points to fit on a page.
+ */
+async function truncateLatex(texContent) {
+  const response = await ai.models.generateContent({
+    model: "gemini-3.5-flash-lite",
+    contents: `You are an expert LaTeX editor. The following LaTeX resume code compiles to slightly more than one page.
+Your task is to carefully remove the 1 or 2 LEAST significant bullet points (e.g., from older projects, minor responsibilities, or older experience) so that it fits on one page.
+
+RULES:
+1. Do NOT change any document styling, margins, or packages.
+2. Ensure the LaTeX syntax remains perfectly valid (do not break \\begin{itemize} or \\end{itemize} tags).
+3. ONLY remove 1-2 bullet points (i.e. \\item lines). Do not rewrite or summarize other points.
+4. Output ONLY the raw updated LaTeX code, without markdown blocks.
+
+CURRENT LATEX CODE:
+${texContent}
+
+Generate the updated LaTeX code now:`,
+  });
+
+  return response.text || "";
+}
+
 module.exports = {
   extractResumeData,
   chatWithUser,
   generateLatex,
   enhanceContent,
   optimizeResumeForATS,
+  truncateLatex,
 };

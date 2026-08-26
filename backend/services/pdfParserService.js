@@ -38,21 +38,27 @@ function escapeLatexUrl(url) {
     .replace(/~/g, "\\~");
 }
 
-/**
- * Checks if a text bounding box intersects with a link annotation bounding box.
- * pdf.js rects are typically [xMin, yMin, xMax, yMax].
- */
 function checkIntersection(textRect, linkRect) {
   const [tXmin, tYmin, tXmax, tYmax] = textRect;
-  const [lXmin, lYmin, lXmax, lYmax] = linkRect;
+  // Ensure link rect coordinates are correctly ordered
+  const lXmin = Math.min(linkRect[0], linkRect[2]);
+  const lXmax = Math.max(linkRect[0], linkRect[2]);
+  const lYmin = Math.min(linkRect[1], linkRect[3]);
+  const lYmax = Math.max(linkRect[1], linkRect[3]);
 
-  // Simple AABB intersection check
-  return !(
-    tXmax < lXmin ||
-    tXmin > lXmax ||
-    tYmax < lYmin ||
-    tYmin > lYmax
-  );
+  // Calculate vertical center of text to prevent overlapping with adjacent lines
+  const tYCenter = (tYmin + tYmax) / 2;
+  const tXCenter = (tXmin + tXmax) / 2;
+
+  // Check if horizontal center of text is within link bounds, OR 
+  // if text is entirely within the link bounds, or link is entirely within text bounds.
+  // Using centers prevents a long line from being captured by a small link.
+  const xIntersects = (tXCenter >= lXmin && tXCenter <= lXmax) || (tXmin >= lXmin && tXmax <= lXmax) || (lXmin >= tXmin && lXmax <= tXmax);
+  
+  // Check Y-axis intersection using the center of the text
+  const yIntersects = tYCenter >= lYmin && tYCenter <= lYmax;
+
+  return xIntersects && yIntersects;
 }
 
 /**

@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Express backend base URL
-const API_BASE_URL = '/api';
+const API_BASE_URL = 'https://resume-builder-9j6w.onrender.com/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,

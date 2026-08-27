@@ -7,6 +7,7 @@ const initialState = {
   resumeData: null,
   chatHistory: [],
   generatedPdfUrl: null,
+  generatedLatex: null,
   isLoading: false,
   loadingMessage: '',
   error: null,
@@ -27,6 +28,8 @@ function builderReducer(state, action) {
       return { ...state, chatHistory: [...state.chatHistory, action.payload] };
     case 'SET_PDF_URL':
       return { ...state, generatedPdfUrl: action.payload };
+    case 'SET_LATEX_CODE':
+      return { ...state, generatedLatex: action.payload };
     case 'SET_LOADING':
       return {
         ...state,

@@ -5,6 +5,7 @@ export default function PreviewDownload() {
   const { state, dispatch } = useBuilder();
 
   const [isDownloading, setIsDownloading] = React.useState(false);
+  const [isCopied, setIsCopied] = React.useState(false);
 
   const handleDownload = () => {
     console.log("Download button clicked. URL:", state.generatedPdfUrl);
@@ -36,6 +37,31 @@ export default function PreviewDownload() {
     dispatch({ type: 'RESET' });
   };
 
+  const handleCopyLatex = () => {
+    if (state.generatedLatex) {
+      navigator.clipboard.writeText(state.generatedLatex)
+        .then(() => {
+          setIsCopied(true);
+          setTimeout(() => setIsCopied(false), 2000);
+        })
+        .catch(err => console.error("Failed to copy LaTeX code: ", err));
+    }
+  };
+
+  const handleDownloadLatex = () => {
+    if (state.generatedLatex) {
+      const blob = new Blob([state.generatedLatex], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `resume-${state.template || 'output'}.tex`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  };
+
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', maxWidth: '900px' }}>
       <h2 style={{ textAlign: 'center', marginBottom: '0.75rem' }}>
@@ -51,7 +77,7 @@ export default function PreviewDownload() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '1.5rem' }}>
         <button 
           className="btn btn-primary btn-xl" 
           onClick={handleDownload}
@@ -60,7 +86,26 @@ export default function PreviewDownload() {
         >
           {isDownloading ? '⏳ Downloading...' : '⬇️ Download Resume PDF'}
         </button>
-        <button className="btn btn-secondary btn-lg" onClick={handleStartOver}>
+        
+        <button 
+          className="btn btn-secondary btn-xl" 
+          onClick={handleDownloadLatex}
+          disabled={!state.generatedLatex}
+        >
+          📝 Download LaTeX Code
+        </button>
+
+        <button 
+          className="btn btn-secondary btn-xl" 
+          onClick={handleCopyLatex}
+          disabled={!state.generatedLatex}
+        >
+          {isCopied ? '✅ Copied!' : '📋 Copy LaTeX Code'}
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <button className="btn btn-ghost btn-lg" onClick={handleStartOver}>
           🔄 Start Over
         </button>
       </div>

@@ -245,11 +245,12 @@ async function generateLatexResume(req, res) {
 
     console.log(`- PDF Size: ${finalPdfBuffer.length} bytes`);
     
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", 'attachment; filename="resume.pdf"');
-    
-    console.log("🚀 Sending PDF back to client...");
-    return res.send(finalPdfBuffer);
+    console.log("🚀 Sending PDF and LaTeX back to client...");
+    return res.json({
+      success: true,
+      pdfBase64: finalPdfBuffer.toString("base64"),
+      latex: texContent
+    });
   } catch (error) {
     console.error("❌ generateLatexResume Controller Error:", error);
     return res.status(500).json({ success: false, error: error.message });

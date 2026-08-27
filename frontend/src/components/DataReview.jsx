@@ -15,11 +15,24 @@ export default function DataReview() {
     });
 
     try {
-      const pdfBlob = await generateLatexApi(state.resumeData, state.template);
-      const url = URL.createObjectURL(pdfBlob);
-      dispatch({ type: 'SET_PDF_URL', payload: url });
-      dispatch({ type: 'SET_LOADING', payload: { isLoading: false } });
-      dispatch({ type: 'NEXT_STEP' });
+      const result = await generateLatexApi(state.resumeData, state.template);
+      if (result.success) {
+        const binaryString = window.atob(result.pdfBase64);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        const pdfBlob = new Blob([bytes], { type: 'application/pdf' });
+        const url = URL.createObjectURL(pdfBlob);
+        
+        dispatch({ type: 'SET_PDF_URL', payload: url });
+        dispatch({ type: 'SET_LATEX_CODE', payload: result.latex });
+        dispatch({ type: 'SET_LOADING', payload: { isLoading: false } });
+        dispatch({ type: 'NEXT_STEP' });
+      } else {
+        throw new Error(result.error || 'Failed to generate PDF.');
+      }
     } catch (err) {
       dispatch({ type: 'SET_LOADING', payload: { isLoading: false } });
       dispatch({

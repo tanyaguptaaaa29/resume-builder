@@ -36,8 +36,7 @@ export async function chatApi(messages) {
 export async function generateLatexApi(data, template) {
   const response = await api.post(
     '/generate-latex',
-    { data, template },
-    { responseType: 'blob' }
+    { data, template }
   );
   return response.data;
 }

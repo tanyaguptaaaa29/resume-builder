@@ -156,6 +156,7 @@ Fill in the placeholders (like <<FullName>>, <<EducationEntries>>, <<LeetCode>>,
 Do NOT change the documentclass, margins, spacing, or heading styles. 
 Replace the example entries with actual data, repeating the formatting as necessary.
 CRITICAL: If an optional field like <<LeetCode>> or <<CodeForces>> is not present in the provided JSON data, you MUST cleanly remove its placeholder along with any preceding or trailing separators (like '|' or '\\,') so the header looks natural.
+CRITICAL: If an entire section (e.g., Experience, Projects, Achievements, Certifications) is empty or missing in the JSON data, you MUST completely remove that section from the LaTeX output, including its section heading and any associated formatting. Do not write "None" or leave an empty heading.
 
 TEMPLATE:
 ${templateContent}`
@@ -189,6 +190,7 @@ COMMON LATEX RULES:
 1. All special LaTeX characters MUST be properly escaped (%, &, $, #, _, {, }, ~, ^)
 2. Output ONLY the complete .tex file content, no markdown blocks.
 3. CRITICAL: Maintain as much of the provided information as possible while writing the LaTeX code. Do not exaggerate or bloat the content, but make sure the user's provided points are kept and rephrased naturally. Do NOT arbitrarily drop bullet points.
+4. CRITICAL: If an entire section (e.g., Experience, Projects, Achievements, Certifications) is empty or missing in the JSON data, you MUST completely omit that section from the LaTeX output including its section heading.
 
 RESUME DATA (JSON):
 ${resumeData}

@@ -162,10 +162,19 @@ Generate the complete .tex file now:`,
   let latexCode = response.text || "";
   
   // Post-processing: Remove any empty sections the AI failed to omit (prevents LaTeX "missing \item" errors)
-  // Matches \resheading{...} or \section{...} followed by an itemize/highlights block that DOES NOT contain an \item
-  latexCode = latexCode.replace(/(?:\\resheading\{.*?\}|\\section\{.*?\})\s*\\begin\{(itemize|highlights|highlightsforbulletentries)\}(?:(?!\\item)[\s\S])*?\\end\{\1\}/g, "");
-  // Matches any standalone empty itemize/highlights blocks that have no \item
-  latexCode = latexCode.replace(/\\begin\{(itemize|highlights|highlightsforbulletentries)\}(?:(?!\\item)[\s\S])*?\\end\{\1\}/g, "");
+  const docStart = latexCode.indexOf('\\begin{document}');
+  if (docStart !== -1) {
+    let preamble = latexCode.substring(0, docStart);
+    let body = latexCode.substring(docStart);
+    // Matches \resheading{...} or \section{...} followed by an itemize/highlights block that DOES NOT contain an \item
+    body = body.replace(/(?:\\resheading\{.*?\}|\\section\{.*?\})\s*\\begin\{(itemize|highlights|highlightsforbulletentries)\}(?:(?!\\item)[\s\S])*?\\end\{\1\}/g, "");
+    // Matches any standalone empty itemize/highlights blocks that have no \item
+    body = body.replace(/\\begin\{(itemize|highlights|highlightsforbulletentries)\}(?:(?!\\item)[\s\S])*?\\end\{\1\}/g, "");
+    latexCode = preamble + body;
+  } else {
+    latexCode = latexCode.replace(/(?:\\resheading\{.*?\}|\\section\{.*?\})\s*\\begin\{(itemize|highlights|highlightsforbulletentries)\}(?:(?!\\item)[\s\S])*?\\end\{\1\}/g, "");
+    latexCode = latexCode.replace(/\\begin\{(itemize|highlights|highlightsforbulletentries)\}(?:(?!\\item)[\s\S])*?\\end\{\1\}/g, "");
+  }
   
   return latexCode;
 }

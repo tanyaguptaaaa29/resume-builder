@@ -152,6 +152,7 @@ COMMON LATEX RULES:
 2. Output ONLY the complete .tex file content, no markdown blocks.
 3. CRITICAL: Maintain as much of the provided information as possible while writing the LaTeX code. Do not exaggerate or bloat the content, but make sure the user's provided points are kept and rephrased naturally. Do NOT arbitrarily drop bullet points.
 4. CRITICAL: If an entire section (e.g., Experience, Projects, Achievements, Certifications) is empty or missing in the JSON data, you MUST completely omit that section from the LaTeX output including its section heading.
+5. CRITICAL: When inserting email addresses or URLs that contain underscores (_), you MUST escape them as \\_ in the visible display text. However, inside the \\href{URL} parameter itself, do NOT escape the underscore. Example: \\href{mailto:first_last@email.com}{first\\_last@email.com}
 
 RESUME DATA (JSON):
 ${resumeData}

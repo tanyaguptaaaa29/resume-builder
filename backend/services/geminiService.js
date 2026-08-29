@@ -162,10 +162,10 @@ Generate the complete .tex file now:`,
   let latexCode = response.text || "";
   
   // Post-processing: Remove any empty sections the AI failed to omit (prevents LaTeX "missing \item" errors)
-  // Matches \resheading{...} followed by an itemize block that DOES NOT contain an \item (e.g., contains only comments or whitespace)
-  latexCode = latexCode.replace(/\\resheading\{[^\n]+\}\s*\\begin\{itemize\}(?:(?!\\item)[\s\S])*?\\end\{itemize\}/g, "");
-  // Matches any standalone empty itemize blocks that have no \item
-  latexCode = latexCode.replace(/\\begin\{itemize\}(?:(?!\\item)[\s\S])*?\\end\{itemize\}/g, "");
+  // Matches \resheading{...} or \section{...} followed by an itemize/highlights block that DOES NOT contain an \item
+  latexCode = latexCode.replace(/(?:\\resheading\{.*?\}|\\section\{.*?\})\s*\\begin\{(itemize|highlights|highlightsforbulletentries)\}(?:(?!\\item)[\s\S])*?\\end\{\1\}/g, "");
+  // Matches any standalone empty itemize/highlights blocks that have no \item
+  latexCode = latexCode.replace(/\\begin\{(itemize|highlights|highlightsforbulletentries)\}(?:(?!\\item)[\s\S])*?\\end\{\1\}/g, "");
   
   return latexCode;
 }

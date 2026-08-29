@@ -161,10 +161,10 @@ Generate the complete .tex file now:`,
   let latexCode = response.text || "";
   
   // Post-processing: Remove any empty sections the AI failed to omit (prevents LaTeX "missing \item" errors)
-  // Matches \resheading{...} followed by an empty \begin{itemize} \end{itemize}
-  latexCode = latexCode.replace(/\\resheading\{[^\n]+\}\s*\\begin\{itemize\}\s*\\end\{itemize\}/g, "");
-  // Matches any standalone empty itemize blocks
-  latexCode = latexCode.replace(/\\begin\{itemize\}\s*\\end\{itemize\}/g, "");
+  // Matches \resheading{...} followed by an itemize block that DOES NOT contain an \item (e.g., contains only comments or whitespace)
+  latexCode = latexCode.replace(/\\resheading\{[^\n]+\}\s*\\begin\{itemize\}(?:(?!\\item)[\s\S])*?\\end\{itemize\}/g, "");
+  // Matches any standalone empty itemize blocks that have no \item
+  latexCode = latexCode.replace(/\\begin\{itemize\}(?:(?!\\item)[\s\S])*?\\end\{itemize\}/g, "");
   
   return latexCode;
 }

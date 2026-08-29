@@ -158,7 +158,15 @@ ${resumeData}
 Generate the complete .tex file now:`,
   });
 
-  return response.text || "";
+  let latexCode = response.text || "";
+  
+  // Post-processing: Remove any empty sections the AI failed to omit (prevents LaTeX "missing \item" errors)
+  // Matches \resheading{...} followed by an empty \begin{itemize} \end{itemize}
+  latexCode = latexCode.replace(/\\resheading\{[^\n]+\}\s*\\begin\{itemize\}\s*\\end\{itemize\}/g, "");
+  // Matches any standalone empty itemize blocks
+  latexCode = latexCode.replace(/\\begin\{itemize\}\s*\\end\{itemize\}/g, "");
+  
+  return latexCode;
 }
 
 /**

@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-// Express backend base URL
+// Use environment variable if available, otherwise default to local backend
 const API_BASE_URL = 'https://resume-builder-9j6w.onrender.com/api';
 
 const api = axios.create({
@@ -19,14 +19,6 @@ export async function parseResumeApi(file) {
       'Content-Type': 'multipart/form-data',
     },
   });
-  return response.data;
-}
-
-/**
- * Send chat message history → get Gemma response
- */
-export async function chatApi(messages) {
-  const response = await api.post('/chat', { messages });
   return response.data;
 }
 

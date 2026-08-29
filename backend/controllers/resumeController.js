@@ -1,10 +1,8 @@
 const { extractTextFromPdf } = require("../services/pdfParserService");
 const {
   extractResumeData,
-  chatWithUser,
   generateLatex,
   enhanceContent,
-  optimizeResumeForATS,
   truncateLatex,
 } = require("../services/geminiService");
 const { compileLatex } = require("../services/latexCompilerService");
@@ -18,8 +16,8 @@ async function parseResume(req, res) {
       return res.status(400).json({ success: false, error: "No PDF file uploaded" });
     }
 
-    // Extract text from PDF buffer
-    const rawText = await extractTextFromPdf(req.file.buffer);
+    // Extract text and links from PDF buffer
+    const { rawText, links } = await extractTextFromPdf(req.file.buffer);
 
     if (!rawText || rawText.length < 50) {
       return res.status(400).json({
@@ -29,14 +27,11 @@ async function parseResume(req, res) {
     }
 
     // Pass to Gemma 4 for JSON structuring
-    const structuredJson = await extractResumeData(rawText);
-
-    // ATS Optimization Layer
-    const optimizedJsonStr = await optimizeResumeForATS(structuredJson);
+    const structuredJson = await extractResumeData(rawText, links);
 
     let data;
     try {
-      let cleaned = optimizedJsonStr.trim();
+      let cleaned = structuredJson.trim();
       
       // If the LLM included conversational text, extract just the JSON block
       const jsonBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
@@ -54,7 +49,7 @@ async function parseResume(req, res) {
       data = JSON.parse(cleaned);
     } catch (err) {
       console.error("JSON Parse Error in parseResume:", err.message);
-      console.error("Failed JSON string:", optimizedJsonStr);
+      console.error("Failed JSON string:", structuredJson);
       return res.status(500).json({
         success: false,
         error: "Failed to parse structured JSON from LLM output",
@@ -68,55 +63,6 @@ async function parseResume(req, res) {
   }
 }
 
-/**
- * Controller: Handle guided chat turn with Gemma 4
- */
-async function chat(req, res) {
-  try {
-    const { messages } = req.body;
-    if (!messages || !Array.isArray(messages)) {
-      return res.status(400).json({ success: false, error: "Messages array required" });
-    }
-
-    const reply = await chatWithUser(messages);
-    const isComplete = reply.includes("[EXTRACTION_COMPLETE]");
-
-    let data = null;
-    let cleanReply = reply;
-
-    if (isComplete) {
-      const jsonPart = reply.split("[EXTRACTION_COMPLETE]")[1]?.trim();
-      if (jsonPart) {
-        try {
-          // ATS Optimization Layer
-          const optimizedJsonStr = await optimizeResumeForATS(jsonPart);
-          
-          let cleaned = optimizedJsonStr.trim();
-          const jsonBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-          if (jsonBlockMatch) {
-            cleaned = jsonBlockMatch[1];
-          } else {
-            if (cleaned.startsWith("```")) {
-              cleaned = cleaned.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-            }
-          }
-          // Sanitize unescaped backslashes
-          cleaned = cleaned.replace(/(?<!\\)\\(?!["\\/bfnrtu])/g, "\\\\");
-          data = JSON.parse(cleaned);
-        } catch {
-          cleanReply = "I have collected your information! Preparing your review...";
-        }
-      }
-      cleanReply = reply.split("[EXTRACTION_COMPLETE]")[0]?.trim() ||
-        "Great! I have all your information. Generating your resume now...";
-    }
-
-    return res.json({ success: true, reply: cleanReply, isComplete, data });
-  } catch (error) {
-    console.error("chat Controller Error:", error);
-    return res.status(500).json({ success: false, error: error.message });
-  }
-}
 
 
 /**
@@ -299,7 +245,6 @@ async function enhance(req, res) {
 
 module.exports = {
   parseResume,
-  chat,
   generateLatexResume,
   enhance,
 };

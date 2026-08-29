@@ -4,10 +4,6 @@ export default function LandingPage({ onStart }) {
   return (
     <>
       <section className="landing-hero">
-        <div className="hero-badge">
-          <span className="badge">⚡ Powered by Node.js, AI & LaTeX</span>
-        </div>
-
         <h1 className="hero-title">
           ATS-Perfect Resumes
           <br />
@@ -45,11 +41,10 @@ export default function LandingPage({ onStart }) {
           </div>
 
           <div className="glass-card feature-card">
-            <div className="feature-icon">🤖</div>
-            <h3>Gemma + Gemini AI</h3>
+            <div className="feature-icon">✨</div>
+            <h3>AI-Powered Enhancements</h3>
             <p>
-              Two-tier LLM pipeline: Gemma handles low-cost chat & extraction,
-              while Gemini Flash generates valid LaTeX code.
+              Instantly rewrite and polish your resume bullet points using the Gemini model to maximize your impact.
             </p>
           </div>
 

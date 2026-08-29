@@ -43,14 +43,6 @@ export default function DataReview() {
   };
 
   const handleEnhance = async (section) => {
-    if (!state.isPremium) {
-      dispatch({
-        type: 'SET_ERROR',
-        payload: 'Premium enhancement is unlocked in Premium Mode. Check the toggle above!',
-      });
-      return;
-    }
-
     dispatch({
       type: 'SET_LOADING',
       payload: { isLoading: true, message: `Enhancing ${section} via Gemini...` },
@@ -75,19 +67,6 @@ export default function DataReview() {
       <p style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
         Make sure everything looks good before we compile your resume.
       </p>
-
-      {/* Premium Toggle */}
-      <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={state.isPremium}
-            onChange={(e) => dispatch({ type: 'SET_PREMIUM', payload: e.target.checked })}
-            style={{ width: '18px', height: '18px', accentColor: '#f59e0b' }}
-          />
-          <span className="badge badge-premium">✨ Premium Mode</span>
-        </label>
-      </div>
 
       <div className="review-grid">
         {/* Personal Info */}
@@ -116,9 +95,11 @@ export default function DataReview() {
         {/* Skills */}
         <div className="glass-card">
           <h4 style={{ color: 'var(--color-accent)', marginBottom: '1rem' }}>🛠 Technical Skills</h4>
-          {data.skills.languages?.length > 0 && <p><strong>Languages:</strong> {data.skills.languages.join(', ')}</p>}
-          {data.skills.frameworks?.length > 0 && <p><strong>Frameworks:</strong> {data.skills.frameworks.join(', ')}</p>}
-          {data.skills.tools?.length > 0 && <p><strong>Tools:</strong> {data.skills.tools.join(', ')}</p>}
+          {data.skills?.map((skill, i) => (
+            skill.category && skill.items && (
+              <p key={i}><strong>{skill.category}:</strong> {skill.items}</p>
+            )
+          ))}
         </div>
 
         {/* Projects */}
@@ -126,15 +107,17 @@ export default function DataReview() {
           <div className="glass-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h4 style={{ color: 'var(--color-accent)' }}>🚀 Projects</h4>
-              {state.isPremium && (
-                <button className="btn btn-ghost" style={{ fontSize: '0.8rem' }} onClick={() => handleEnhance('projects')}>
-                  ✨ Enhance
-                </button>
-              )}
+              <button className="btn btn-ghost" style={{ fontSize: '0.8rem' }} onClick={() => handleEnhance('projects')}>
+                ✨ Enhance
+              </button>
             </div>
             {data.projects.map((proj, i) => (
               <div key={i} style={{ marginBottom: '0.75rem' }}>
-                <p><strong>{proj.name}</strong> ({proj.techStack?.join(', ')})</p>
+                <p>
+                  <strong>{proj.name}</strong> ({proj.techStack?.join(', ')})
+                  {proj.link && <span style={{ marginLeft: '0.5rem' }}><a href={proj.link} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)' }}>[Source]</a></span>}
+                  {proj.liveLink && <span style={{ marginLeft: '0.5rem' }}><a href={proj.liveLink} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)' }}>[Live]</a></span>}
+                </p>
                 {proj.bullets?.map((b, j) => (
                   <p key={j} style={{ fontSize: '0.85rem', paddingLeft: '0.5rem' }}>• {b}</p>
                 ))}
@@ -148,11 +131,9 @@ export default function DataReview() {
           <div className="glass-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h4 style={{ color: 'var(--color-accent)' }}>💼 Experience</h4>
-              {state.isPremium && (
-                <button className="btn btn-ghost" style={{ fontSize: '0.8rem' }} onClick={() => handleEnhance('experience')}>
-                  ✨ Enhance
-                </button>
-              )}
+              <button className="btn btn-ghost" style={{ fontSize: '0.8rem' }} onClick={() => handleEnhance('experience')}>
+                ✨ Enhance
+              </button>
             </div>
             {data.experience.map((exp, i) => (
               <div key={i} style={{ marginBottom: '0.75rem' }}>

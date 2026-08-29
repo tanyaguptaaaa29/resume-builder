@@ -2,7 +2,6 @@ const express = require("express");
 const multer = require("multer");
 const {
   parseResume,
-  chat,
   generateLatexResume,
   enhance,
 } = require("../controllers/resumeController");
@@ -17,7 +16,7 @@ const upload = multer({
 
 // API Routes
 router.post("/parse-resume", upload.single("file"), parseResume);
-router.post("/chat", chat);
+
 router.post("/generate-latex", generateLatexResume);
 router.post("/enhance", enhance);
 

@@ -10,7 +10,7 @@ const ai = new GoogleGenAI({
 /**
  * Phase 1: Extract structured JSON from raw resume text using Gemma 4
  */
-async function extractResumeData(resumeText) {
+async function extractResumeData(resumeText, links = []) {
   const response = await ai.models.generateContent({
     model: "gemini-3.5-flash-lite",
     contents: `You are a resume data extraction expert. Extract ALL structured information from the following resume text and return it as a valid JSON object.
@@ -50,15 +50,13 @@ The JSON must follow this exact schema:
     "description": "string (optional)",
     "techStack": ["string"],
     "bullets": ["string"],
-    "link": "string (optional)"
+    "link": "string (optional, usually GitHub/Source code)",
+    "liveLink": "string (optional, live deployment URL)"
   }],
-  "skills": {
-    "languages": ["string"],
-    "frameworks": ["string"],
-    "tools": ["string"],
-    "databases": ["string"],
-    "other": ["string"]
-  },
+  "skills": [{
+    "category": "string (e.g. Languages, Frameworks, Tools)",
+    "items": "string (comma-separated list)"
+  }],
   "achievements": [{
     "title": "string",
     "description": "string (optional)",
@@ -82,58 +80,19 @@ IMPORTANT:
 - Return ONLY valid JSON, no markdown code blocks, no explanations.
 - If a section is not present in the resume, omit it or use an empty array.
 - Ensure all bullet points are extracted verbatim from the resume.
-- EXTRACTION OF URLS: The text may contain links formatted as LaTeX commands (e.g. \href{URL}{Text}). If a JSON field specifically expects a URL (like linkedin, github, portfolio, or a project link), extract ONLY the raw URL string.
-- IN-TEXT LINKS: If an \href command appears in the middle of a bullet point, preserve the entire \href{URL}{Text} tag exactly as it is within the bullet point.
+- SEMANTIC LINK MATCHING: You are provided with a separate array of 'Extracted URLs' found in the document. You MUST intelligently deduce which URL belongs to which field. For example, if a URL contains 'github.com', it likely belongs to a project 'link' or the main 'github' field. If a URL contains 'linkedin', it goes to 'linkedin'. If a URL looks like a live deployment (e.g., vercel, render, custom domain) and contextually matches a project, map it to that project's 'liveLink'. DO NOT put raw URLs inside the bullet points.
+
+Extracted URLs:
+${JSON.stringify(links, null, 2)}
 
 Resume text:
 ${resumeText}`,
+    config: {
+      responseMimeType: "application/json"
+    }
   });
 
   return response.text || "{}";
-}
-
-/**
- * Phase 1: Guided conversation turn using Gemma 4
- */
-async function chatWithUser(messages) {
-  const chatHistory = messages
-    .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
-    .join("\n");
-
-  const response = await ai.models.generateContent({
-    model: "gemini-3.5-flash-lite",
-    contents: `You are a friendly resume building assistant for NSUT students. You are collecting information to build their resume.
-
-CONVERSATION FLOW — Ask ONE question at a time in this order:
-1. Full name
-2. Email, phone, LinkedIn, GitHub (collect all contact info)
-3. College name, degree, branch/field, CGPA, start year - end year
-4. Any other education entries
-5. Technical skills: programming languages, frameworks, tools, databases
-6. Projects (name, tech stack, description/bullet points, link)
-7. Any more projects?
-8. Work experience / internships (company, role, dates, bullet points)
-9. Any more experience?
-10. Achievements, awards, competitive programming ranks
-11. Certifications
-12. Positions of responsibility (college clubs, organizations)
-
-RULES:
-- Ask only ONE question at a time. Keep responses short (1-2 sentences).
-- Be encouraging and conversational, but professional.
-- When user says they have no more items for a section, move to the next section.
-- After collecting ALL information, respond with EXACTLY this format:
-  [EXTRACTION_COMPLETE]
-  followed by the full structured JSON data (same schema as a resume data extraction).
-- DO NOT output the JSON until ALL sections have been covered.
-
-CONVERSATION SO FAR:
-${chatHistory}
-
-Respond as the Assistant:`,
-  });
-
-  return response.text || "";
 }
 
 /**
@@ -157,6 +116,7 @@ Do NOT change the documentclass, margins, spacing, or heading styles.
 Replace the example entries with actual data, repeating the formatting as necessary.
 CRITICAL: If an optional field like <<LeetCode>> or <<CodeForces>> is not present in the provided JSON data, you MUST cleanly remove its placeholder along with any preceding or trailing separators (like '|' or '\\,') so the header looks natural.
 CRITICAL: If an entire section (e.g., Experience, Projects, Achievements, Certifications) is empty or missing in the JSON data, you MUST completely remove that section from the LaTeX output, including its section heading and any associated formatting. Do not write "None" or leave an empty heading.
+CRITICAL: For projects, if both a 'link' (Source Code) and 'liveLink' are provided, separate them clearly in the project header (e.g., using |). If only one or none is provided, format the header cleanly without dangling separators.
 
 TEMPLATE:
 ${templateContent}`
@@ -221,43 +181,14 @@ RESUME DATA:
 ${resumeData}
 
 Return ONLY valid JSON:`,
+    config: {
+      responseMimeType: "application/json"
+    }
   });
 
   return response.text || "{}";
 }
 
-/**
- * Phase 1.5: ATS Optimization Layer (Tech/SDE focus)
- */
-async function optimizeResumeForATS(resumeDataStr) {
-  const response = await ai.models.generateContent({
-    model: "gemini-3.5-flash-lite",
-    contents: `You are an elite Tech/SDE Resume Writer and ATS Optimization Expert.
-Your job is to rewrite the provided resume JSON to achieve the HIGHEST POSSIBLE ATS SCORE for Software Engineering and Tech roles.
-
-OPTIMIZATION RULES:
-1. REWRITE ALL BULLET POINTS in "experience", "projects", and "positionsOfResponsibility".
-2. Use the XYZ formula: "Accomplished [X] as measured by [Y], by doing [Z]".
-3. Start every bullet point with a strong, high-impact action verb (e.g., Architected, Engineered, Designed, Developed, Spearheaded, Optimized).
-4. PRESERVE THE EXACT NUMBER OF BULLETS: Do not merge, combine, or summarize bullet points. If a project had 3 bullets in the original JSON, it MUST have exactly 3 bullets in the output. Just rephrase each individual bullet to be stronger.
-5. NEVER INVENT OR ADD ARBITRARY NUMBERS OR METRICS if they were not provided.
-6. CRITICAL: NEVER REMOVE OR DILUTE ANY NUMBERS, METRICS, OR IMPACT PERCENTAGES PROVIDED BY THE USER. If the user wrote "saving 10 human hours", "reduced load times by 80%", "increased by 20%", etc., you MUST prominently feature those EXACT numbers in your rewritten bullet point to highlight their impact. Do not generalize them into "streamlined" or "accelerated".
-7. Emphasize Technical Skills: Naturally weave in languages, frameworks, and cloud technologies into the bullet points.
-8. Keep bullet points concise (1-2 lines) but extremely dense with impact and keywords.
-9. CRITICAL: Do NOT artificially bloat the resume or invent details out of thin air. Ensure every bullet point strictly follows the XYZ ATS format wherever possible.
-10. DO NOT invent entirely new fake jobs or projects, just elevate the existing ones to sound like an elite top-tier candidate.
-11. PRESERVE LATEX LINKS: The JSON might contain LaTeX links like \\href{https://...}{Text} inside bullet points. You MUST preserve these exact tags when rephrasing bullet points. Do not break or remove them.
-
-Return the COMPLETE, fully-optimized JSON matching the exact same schema.
-
-RESUME DATA:
-${resumeDataStr}
-
-Return ONLY valid JSON:`,
-  });
-
-  return response.text || "{}";
-}
 
 /**
  * Truncates existing LaTeX by removing the 1-2 least significant bullet points to fit on a page.
@@ -285,9 +216,7 @@ Generate the updated LaTeX code now:`,
 
 module.exports = {
   extractResumeData,
-  chatWithUser,
   generateLatex,
   enhanceContent,
-  optimizeResumeForATS,
   truncateLatex,
 };

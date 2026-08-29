@@ -20,46 +20,6 @@ async function configurePdfJs() {
   return pdfjsLib;
 }
 
-/**
- * Escapes special LaTeX characters in a URL so the compiler won't crash.
- */
-function escapeLatexUrl(url) {
-  if (!url) return "";
-  return url
-    .replace(/\\/g, "\\\\")
-    .replace(/%/g, "\\%")
-    .replace(/\#/g, "\\#")
-    .replace(/_/g, "\\_")
-    .replace(/&/g, "\\&")
-    .replace(/\$/g, "\\$")
-    .replace(/\{/g, "\\{")
-    .replace(/\}/g, "\\}")
-    .replace(/\^/g, "\\^")
-    .replace(/~/g, "\\~");
-}
-
-function checkIntersection(textRect, linkRect) {
-  const [tXmin, tYmin, tXmax, tYmax] = textRect;
-  // Ensure link rect coordinates are correctly ordered
-  const lXmin = Math.min(linkRect[0], linkRect[2]);
-  const lXmax = Math.max(linkRect[0], linkRect[2]);
-  const lYmin = Math.min(linkRect[1], linkRect[3]);
-  const lYmax = Math.max(linkRect[1], linkRect[3]);
-
-  // Calculate vertical center of text to prevent overlapping with adjacent lines
-  const tYCenter = (tYmin + tYmax) / 2;
-  const tXCenter = (tXmin + tXmax) / 2;
-
-  // Check if horizontal center of text is within link bounds, OR 
-  // if text is entirely within the link bounds, or link is entirely within text bounds.
-  // Using centers prevents a long line from being captured by a small link.
-  const xIntersects = (tXCenter >= lXmin && tXCenter <= lXmax) || (tXmin >= lXmin && tXmax <= lXmax) || (lXmin >= tXmin && lXmax <= tXmax);
-  
-  // Check Y-axis intersection using the center of the text
-  const yIntersects = tYCenter >= lYmin && tYCenter <= lYmax;
-
-  return xIntersects && yIntersects;
-}
 
 /**
  * Extract raw text from uploaded PDF resume buffer, including hyperlink annotations mapped to text.
@@ -79,6 +39,7 @@ async function extractTextFromPdf(pdfBuffer) {
     const pdfDocument = await loadingTask.promise;
     
     let fullText = "";
+    const allLinks = new Set();
 
     for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
       const page = await pdfDocument.getPage(pageNum);
@@ -86,10 +47,12 @@ async function extractTextFromPdf(pdfBuffer) {
       const textContent = await page.getTextContent();
       const annotations = await page.getAnnotations();
       
-      // Filter out only link annotations with URLs
-      const linkAnnotations = annotations.filter(
-        (a) => a.subtype === "Link" && a.url && a.rect
-      );
+      // Collect all valid URLs from this page
+      annotations.forEach(a => {
+        if (a.subtype === "Link" && a.url) {
+          allLinks.add(a.url);
+        }
+      });
       
       let pageText = "";
       let currentY = null;
@@ -100,37 +63,14 @@ async function extractTextFromPdf(pdfBuffer) {
           continue;
         }
 
-        // item.transform is [scaleX, skewY, skewX, scaleY, translateX, translateY]
-        const xMin = item.transform[4];
         const yMin = item.transform[5];
-        const xMax = xMin + item.width;
-        const yMax = yMin + item.height;
-        const textRect = [xMin, yMin, xMax, yMax];
-
-        let matchedUrl = null;
-        for (const link of linkAnnotations) {
-          // pdfjs-dist link.rect might need some padding/adjustment, but standard AABB usually works
-          if (checkIntersection(textRect, link.rect)) {
-            matchedUrl = link.url;
-            break; // take first match
-          }
-        }
-
-        let textToWrite = item.str;
-        if (matchedUrl) {
-          const safeUrl = escapeLatexUrl(matchedUrl);
-          // Only wrap if the text isn't empty space
-          if (textToWrite.trim().length > 0) {
-              textToWrite = `\\href{${safeUrl}}{${textToWrite}}`;
-          }
-        }
 
         // Add newline if Y changed significantly (e.g. moving to next line)
         if (currentY !== null && Math.abs(currentY - yMin) > 4) {
           pageText += "\n";
         }
         
-        pageText += textToWrite;
+        pageText += item.str;
         currentY = yMin;
       }
       
@@ -143,7 +83,7 @@ async function extractTextFromPdf(pdfBuffer) {
     text = text.replace(/\n{3,}/g, "\n\n");
     text = text.trim();
 
-    return text;
+    return { rawText: text, links: Array.from(allLinks) };
   } catch (error) {
     throw new Error(`Failed to parse PDF file with advanced extractor: ${error.message}`);
   }

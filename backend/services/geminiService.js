@@ -117,6 +117,7 @@ Replace the example entries with actual data, repeating the formatting as necess
 CRITICAL: If an optional field like <<LeetCode>> or <<CodeForces>> is not present in the provided JSON data, you MUST cleanly remove its placeholder along with any preceding or trailing separators (like '|' or '\\,') so the header looks natural.
 CRITICAL: If an entire section (e.g., Experience, Projects, Achievements, Certifications) is empty or missing in the JSON data, you MUST completely remove that section from the LaTeX output, including its section heading and any associated formatting. Do not write "None" or leave an empty heading.
 CRITICAL: For projects, if both a 'link' (Source Code) and 'liveLink' are provided, separate them clearly in the project header (e.g., using |). If only one or none is provided, format the header cleanly without dangling separators.
+CRITICAL: For Education entries, ensure the combined length of Course and College/University does not cause text wrapping. Abbreviate aggressively (e.g., use "B.Tech (ECE)" instead of "Bachelor of Technology", "DTU" instead of "Delhi Technological University"). Limit Course to max 30 chars and College to max 35 chars.
 
 TEMPLATE:
 ${templateContent}`
@@ -199,13 +200,18 @@ Return ONLY valid JSON:`,
 
 
 /**
- * Truncates existing LaTeX by removing the 1-2 least significant bullet points to fit on a page.
+ * Truncates existing LaTeX by removing the least significant bullet points to fit on a page.
  */
-async function truncateLatex(texContent) {
+async function truncateLatex(texContent, currentIteration = 1, maxIterations = 4) {
+  const isLastAttempt = currentIteration === maxIterations - 1;
+  const severityPrompt = isLastAttempt
+    ? "Your task is to heavily truncate the LaTeX code. You MUST cut out 3-4 bullet points, and even remove the entire least significant project or experience block if necessary. Be extremely ruthless to ensure it fits on one page no matter what."
+    : "Your task is to carefully remove the 1 or 2 LEAST significant bullet points (e.g., from older projects, minor responsibilities, or older experience) so that it fits on one page.";
+
   const response = await ai.models.generateContent({
     model: "gemini-3.5-flash-lite",
     contents: `You are an expert LaTeX editor. The following LaTeX resume code compiles to slightly more than one page.
-Your task is to carefully remove the 1 or 2 LEAST significant bullet points (e.g., from older projects, minor responsibilities, or older experience) so that it fits on one page.
+${severityPrompt}
 
 RULES:
 1. Do NOT change any document styling, margins, or packages.

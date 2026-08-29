@@ -99,7 +99,7 @@ async function generateLatexResume(req, res) {
     let finalPdfBuffer = null;
     let isSinglePage = false;
     let iterations = 0;
-    const MAX_ITERATIONS = 3;
+    const MAX_ITERATIONS = 4;
 
     while (!isSinglePage && iterations < MAX_ITERATIONS) {
       iterations++;
@@ -136,7 +136,7 @@ async function generateLatexResume(req, res) {
         console.log(`❌ PDF is ${pageCount} pages (Overflow).`);
         if (iterations < MAX_ITERATIONS) {
           console.log("⏳ Triggering AI truncation layer to remove least significant points...");
-          texContent = await truncateLatex(texContent);
+          texContent = await truncateLatex(texContent, iterations, MAX_ITERATIONS);
         } else {
           console.log("⚠️ Reached max iterations. Proceeding with multi-page PDF.");
         }

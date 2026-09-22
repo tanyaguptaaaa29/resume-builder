@@ -1,8 +1,7 @@
 import axios from 'axios';
 
-// In development, Vite dev server proxies '/api' -> 'http://localhost:5000' (zero CORS issues).
-// In production, VITE_API_BASE_URL can override this if backend is hosted on another domain.
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+// Hosted production backend API on Render (fallback to VITE_API_BASE_URL if set)
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://resume-builder-9j6w.onrender.com/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,

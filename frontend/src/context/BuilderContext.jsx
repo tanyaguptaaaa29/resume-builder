@@ -8,6 +8,14 @@ const initialState = {
   chatHistory: [],
   generatedPdfUrl: null,
   generatedLatex: null,
+  // Job Description (JD) Tailoring State
+  jobDescription: '',
+  targetRole: '',
+  tailoredData: null,
+  tailoredPdfUrl: null,
+  tailoredLatex: null,
+  adaptationsSummary: '',
+  activeViewMode: 'original', // 'original' | 'tailored'
   isLoading: false,
   loadingMessage: '',
   error: null,
@@ -30,6 +38,33 @@ function builderReducer(state, action) {
       return { ...state, generatedPdfUrl: action.payload };
     case 'SET_LATEX_CODE':
       return { ...state, generatedLatex: action.payload };
+    case 'SET_JOB_DESCRIPTION':
+      return { ...state, jobDescription: action.payload };
+    case 'SET_TARGET_ROLE':
+      return { ...state, targetRole: action.payload };
+    case 'SET_TAILORED_RESULT':
+      return {
+        ...state,
+        tailoredData: action.payload.data,
+        tailoredPdfUrl: action.payload.pdfUrl,
+        tailoredLatex: action.payload.latex,
+        adaptationsSummary: action.payload.adaptationsSummary || '',
+        activeViewMode: 'tailored',
+      };
+    case 'SET_VIEW_MODE':
+      return { ...state, activeViewMode: action.payload };
+    case 'RESET_TAILORED':
+      if (state.tailoredPdfUrl) {
+        URL.revokeObjectURL(state.tailoredPdfUrl);
+      }
+      return {
+        ...state,
+        tailoredData: null,
+        tailoredPdfUrl: null,
+        tailoredLatex: null,
+        adaptationsSummary: '',
+        activeViewMode: 'original',
+      };
     case 'SET_LOADING':
       return {
         ...state,
@@ -45,6 +80,8 @@ function builderReducer(state, action) {
     case 'PREV_STEP':
       return { ...state, step: Math.max(state.step - 1, 1), error: null };
     case 'RESET':
+      if (state.generatedPdfUrl) URL.revokeObjectURL(state.generatedPdfUrl);
+      if (state.tailoredPdfUrl) URL.revokeObjectURL(state.tailoredPdfUrl);
       return initialState;
     default:
       return state;

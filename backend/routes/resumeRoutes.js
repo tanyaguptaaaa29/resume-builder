@@ -4,6 +4,8 @@ const {
   parseResume,
   generateLatexResume,
   enhance,
+  tailorResume,
+  analyzeGithub,
 } = require("../controllers/resumeController");
 
 const router = express.Router();
@@ -19,5 +21,7 @@ router.post("/parse-resume", upload.single("file"), parseResume);
 
 router.post("/generate-latex", generateLatexResume);
 router.post("/enhance", enhance);
+router.post("/tailor-resume", tailorResume);
+router.post("/analyze-github", analyzeGithub);
 
 module.exports = router;

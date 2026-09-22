@@ -8,10 +8,35 @@ const ai = new GoogleGenAI({
 });
 
 /**
+ * Resilient wrapper around Gemini generateContent with exponential backoff for transient 503/429 spikes
+ */
+async function generateContentWithRetry(params, maxRetries = 3) {
+  let attempt = 0;
+  while (attempt < maxRetries) {
+    try {
+      return await ai.models.generateContent(params);
+    } catch (err) {
+      attempt++;
+      const isTransient =
+        err.status === 503 ||
+        err.status === 429 ||
+        (err.message && (err.message.includes("503") || err.message.includes("429") || err.message.includes("high demand")));
+      if (isTransient && attempt < maxRetries) {
+        const delayMs = attempt * 1500;
+        console.warn(`⚠️ Gemini API transient error (${err.status || 503}). Retrying in ${delayMs / 1000}s (Attempt ${attempt}/${maxRetries})...`);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      } else {
+        throw err;
+      }
+    }
+  }
+}
+
+/**
  * Phase 1: Extract structured JSON from raw resume text using Gemma 4
  */
 async function extractResumeData(resumeText, links = []) {
-  const response = await ai.models.generateContent({
+  const response = await generateContentWithRetry({
     model: "gemini-3.5-flash-lite",
     contents: `You are a resume data extraction expert. Extract ALL structured information from the following resume text and return it as a valid JSON object.
 
@@ -133,7 +158,7 @@ STYLE: Professional corporate format, ATS-optimized.
 - Header: Name left-aligned, contact info right-aligned
 - Experience section should be most prominent with quantified achievements`);
 
-  const response = await ai.models.generateContent({
+  const response = await generateContentWithRetry({
     model: "gemini-3.5-flash-lite",
     contents: `You are an expert LaTeX resume generator. Generate a COMPLETE, COMPILABLE LaTeX document for a resume using the data provided.
 
@@ -184,7 +209,7 @@ Generate the complete .tex file now:`,
  * Premium Tier: Enhance bullet points with action verbs and quantified metrics
  */
 async function enhanceContent(resumeData, section) {
-  const response = await ai.models.generateContent({
+  const response = await generateContentWithRetry({
     model: "gemini-3.5-flash-lite",
     contents: `You are a professional resume writer specializing in ATS-optimized content for tech roles.
 
@@ -218,7 +243,7 @@ async function truncateLatex(texContent, currentIteration = 1, maxIterations = 4
     ? "Your task is to heavily truncate the LaTeX code. You MUST cut out 3-4 bullet points, and even remove the entire least significant project or experience block if necessary. Be extremely ruthless to ensure it fits on one page no matter what."
     : "Your task is to carefully remove the 1 or 2 LEAST significant bullet points (e.g., from older projects, minor responsibilities, or older experience) so that it fits on one page.";
 
-  const response = await ai.models.generateContent({
+  const response = await generateContentWithRetry({
     model: "gemini-3.5-flash-lite",
     contents: `You are an expert LaTeX editor. The following LaTeX resume code compiles to slightly more than one page.
 ${severityPrompt}
@@ -238,9 +263,91 @@ Generate the updated LaTeX code now:`,
   return response.text || "";
 }
 
+/**
+ * Tailor candidate resume data to a target Job Description (JD) without drastic exaggeration
+ */
+async function tailorResumeToJD(
+  resumeData,
+  jobDescription,
+  targetRole = "",
+  githubContext = [],
+  projectNotes = ""
+) {
+  const resumeJson = typeof resumeData === "string" ? resumeData : JSON.stringify(resumeData, null, 2);
+
+  const githubSection =
+    Array.isArray(githubContext) && githubContext.length > 0
+      ? `\nVERIFIED GITHUB CODEBASE CAPABILITIES (GENUINE WORK FROM REAL CODE FILES):
+The candidate provided public GitHub repositories for their projects. We inspected their code files, dependencies, and architecture:
+${JSON.stringify(githubContext, null, 2)}
+AUTHORIZATION: You are explicitly AUTHORIZED to weave in and spotlight these verified technical capabilities, tools, and libraries in the project bullet points when they match the requirements of the target Job Description. This is verified real work, NOT hallucination.\n`
+      : "";
+
+  const notesSection =
+    projectNotes && typeof projectNotes === "string" && projectNotes.trim().length > 0
+      ? `\nCANDIDATE'S ADDITIONAL PROJECT CONTEXT & HIDDEN FEATURES:
+The candidate provided additional technical context regarding their projects:
+${projectNotes.trim()}
+You may incorporate these genuine details into relevant bullet points to align with the JD.\n`
+      : "";
+
+  const response = await generateContentWithRetry({
+    model: "gemini-3.5-flash-lite",
+    contents: `You are an elite career strategist and technical resume consultant specializing in tailored, ATS-optimized resumes.
+
+A candidate wants to tailor their resume for a target Job Description (JD). 
+
+CRITICAL PHILOSOPHY — SUBTLE, GROUNDED REFRAMING (NO DRASTIC EXAGGERATION):
+Most AI tools ruin resumes by hallucinating fake achievements or blindly copying every keyword from the JD. That gets candidates rejected during interviews.
+YOUR GOAL is the opposite: Subtle, believable, and grounded alignment. Keep the candidate's true voice and background intact, while reframing their existing experience to spotlight what the hiring manager cares most about.
+
+STRICT RULES:
+1. ZERO FABRICATION: NEVER invent companies, degrees, dates, jobs, or completely new projects.
+2. METRIC INTEGRITY: NEVER inflate or alter existing numbers, percentages, or scale. If the candidate wrote "saved 10 hours", keep "saved 10 hours".
+3. TERMINOLOGY & REFRAMING:
+   - Match industry terms from the JD where appropriate (e.g. if JD emphasizes "high-throughput APIs" and candidate wrote "made backend faster", reframe to "Optimized backend throughput and response times").
+   - Emphasize transferable aspects of their existing projects/roles that directly address the JD's responsibilities.
+   - If verified codebase capabilities or project notes are provided below, you may bring those genuine implementations into the bullet points.
+   - Ensure bullet points read naturally and easily during an interview. The candidate must be able to comfortably talk about every single point.
+4. SKILLS REORDERING:
+   - Within each skills category (Languages, Frameworks, Tools/Platforms), reorder existing skills so that tools/technologies mentioned in the JD appear FIRST in the comma-separated list.
+   - If a tool is verified in their GitHub codebase manifest (e.g. Docker, Redis, Socket.io), you may also include it in the relevant skills category!
+   - Do NOT add random advanced tools the candidate hasn't worked with.
+5. CONCISE ATS BULLETS:
+   - 1-2 lines per bullet point. Start with strong action verbs.
+6. ADAPTATIONS SUMMARY:
+   - Include a concise 1-2 sentence field "adaptationsSummary" explaining exactly what subtle adjustments and verified codebase features were highlighted to align with the JD.
+
+TARGET JOB DESCRIPTION:
+${jobDescription}
+${targetRole ? `\nTARGET ROLE/TITLE:\n${targetRole}` : ""}
+${githubSection}
+${notesSection}
+CANDIDATE CURRENT RESUME JSON:
+${resumeJson}
+
+OUTPUT FORMAT:
+Return a JSON object with:
+{
+  "adaptationsSummary": "1-2 sentence summary of what was highlighted or reframed",
+  "tailoredResume": {
+    // Full resumeData matching the exact schema (personalInfo, education, experience, projects, skills, achievements, certifications, positionsOfResponsibility)
+  }
+}
+
+Return ONLY valid JSON:`,
+    config: {
+      responseMimeType: "application/json",
+    },
+  });
+
+  return response.text || "{}";
+}
+
 module.exports = {
   extractResumeData,
   generateLatex,
   enhanceContent,
   truncateLatex,
+  tailorResumeToJD,
 };

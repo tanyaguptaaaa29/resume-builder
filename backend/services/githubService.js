@@ -59,6 +59,13 @@ function parseGithubUrl(rawUrl) {
  * 3. Dependency manifests (package.json, requirements.txt, etc.)
  * 4. Truncated README if available
  */
+/**
+ * Fetches a lightweight technical blueprint of a public GitHub repository:
+ * 1. Repo metadata (description, language, default branch)
+ * 2. Recursive file tree (filtered for architecture, infra, models, tests)
+ * 3. Dependency manifests (searches root & monorepo subprojects e.g. wandrly-backend, wandrly-frontend)
+ * 4. Documentation & architecture guides (README, *_flow.md, architecture docs)
+ */
 async function fetchRepoBlueprint(repoUrl) {
   const parsed = parseGithubUrl(repoUrl);
   if (!parsed) {
@@ -68,7 +75,8 @@ async function fetchRepoBlueprint(repoUrl) {
   const { owner, repo } = parsed;
   const headers = {
     "User-Agent": "ResumeBuilder-CodebaseInspector/1.0",
-    Accept: "application/vnd.github.v3+json",
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
   };
 
   if (process.env.GITHUB_TOKEN) {
@@ -78,7 +86,8 @@ async function fetchRepoBlueprint(repoUrl) {
   console.log(`🔍 Inspecting GitHub repository: ${owner}/${repo}...`);
 
   // 1. Fetch basic repository metadata
-  let repoData = { default_branch: "main", description: "", language: "" };
+  let repoData = { default_branch: "main", description: "", language: "", topics: [] };
+  let isRateLimited = false;
   try {
     const metaRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
     if (metaRes.ok) {
@@ -91,6 +100,9 @@ async function fetchRepoBlueprint(repoUrl) {
       };
     } else if (metaRes.status === 404) {
       throw new Error(`Repository '${owner}/${repo}' not found or is private.`);
+    } else if (metaRes.status === 403) {
+      isRateLimited = true;
+      console.warn("⚠️ GitHub API 403 rate limit reached on metadata fetch. Falling back to raw content CDN...");
     } else {
       console.warn(`GitHub meta fetch returned HTTP ${metaRes.status}`);
     }
@@ -103,6 +115,7 @@ async function fetchRepoBlueprint(repoUrl) {
 
   // 2. Fetch recursive file tree
   let filteredTree = [];
+  let rawPaths = [];
   try {
     const treeRes = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`,
@@ -111,10 +124,10 @@ async function fetchRepoBlueprint(repoUrl) {
 
     if (treeRes.ok) {
       const treeData = await treeRes.json();
-      const allPaths = (treeData.tree || []).map((t) => t.path);
+      rawPaths = (treeData.tree || []).map((t) => t.path);
 
       // Filter out noise (images, build dirs, node_modules, lock files)
-      filteredTree = allPaths
+      filteredTree = rawPaths
         .filter((filePath) => {
           const lower = filePath.toLowerCase();
           if (
@@ -137,15 +150,20 @@ async function fetchRepoBlueprint(repoUrl) {
         })
         .slice(0, 150); // Keep top 150 relevant paths
     } else {
-      console.warn(`GitHub tree fetch returned HTTP ${treeRes.status}`);
+      if (treeRes.status === 403) {
+        isRateLimited = true;
+        console.warn("⚠️ GitHub API 403 rate limit reached on tree fetch. Activating resilient raw CDN scanner...");
+      } else {
+        console.warn(`GitHub tree fetch returned HTTP ${treeRes.status}`);
+      }
     }
   } catch (err) {
     console.warn("Could not fetch repo tree:", err.message);
   }
 
-  // 3. Fetch dependency manifest (Node package.json, Python requirements, etc.)
-  let manifest = null;
-  const manifestCandidates = [
+  // 3. Fetch dependency manifests (supports single repos AND monorepos like wandrly-backend / wandrly-frontend)
+  const manifestMap = {};
+  const manifestFilePatterns = [
     "package.json",
     "requirements.txt",
     "pyproject.toml",
@@ -154,46 +172,136 @@ async function fetchRepoBlueprint(repoUrl) {
     "Cargo.toml",
   ];
 
-  for (const mFile of manifestCandidates) {
+  // Candidates to probe:
+  // If we have fileTree, extract any manifest files from the tree.
+  // Otherwise (or in addition), probe root and standard monorepo folder patterns.
+  const manifestTargets = new Set();
+  
+  if (rawPaths.length > 0) {
+    for (const p of rawPaths) {
+      const base = p.split("/").pop();
+      if (manifestFilePatterns.includes(base) && !p.includes("node_modules/") && !p.includes("vendor/")) {
+        manifestTargets.add(p);
+      }
+    }
+  }
+
+  // Common fallbacks for monorepos if tree was unavailable or sparse
+  const lowerRepo = repo.toLowerCase();
+  const commonPrefixes = [
+    "",
+    `${lowerRepo}-backend/`,
+    `${lowerRepo}-frontend/`,
+    `${lowerRepo}-server/`,
+    `${lowerRepo}-client/`,
+    "backend/",
+    "frontend/",
+    "server/",
+    "client/",
+    "api/",
+    "web/",
+    "app/",
+  ];
+
+  for (const prefix of commonPrefixes) {
+    for (const mFile of manifestFilePatterns) {
+      manifestTargets.add(`${prefix}${mFile}`);
+    }
+  }
+
+  // Fetch candidate manifests via raw.githubusercontent.com (Fastly CDN, no 60 req/hr REST rate limits)
+  for (const targetPath of manifestTargets) {
+    if (Object.keys(manifestMap).length >= 5) break; // Cap at top 5 subprojects
     try {
       const rawRes = await fetch(
-        `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${mFile}`
+        `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${targetPath}`
       );
       if (rawRes.ok) {
         const text = await rawRes.text();
-        if (mFile === "package.json") {
+        const base = targetPath.split("/").pop();
+        const scope = targetPath.includes("/") ? targetPath.replace(`/${base}`, "") : "root";
+
+        if (base === "package.json") {
           try {
             const pkg = JSON.parse(text);
-            manifest = {
+            manifestMap[scope] = {
               type: "npm",
               dependencies: Object.keys(pkg.dependencies || {}),
               devDependencies: Object.keys(pkg.devDependencies || {}),
             };
           } catch {
-            manifest = { type: "npm-raw", content: text.substring(0, 1000) };
+            manifestMap[scope] = { type: "npm-raw", content: text.substring(0, 800) };
           }
         } else {
-          manifest = { type: mFile, content: text.substring(0, 1000) };
+          manifestMap[scope] = { type: base, content: text.substring(0, 800) };
         }
-        break; // Stop at first found manifest
       }
     } catch {
-      // Continue to next candidate
+      // Continue to next manifest
     }
   }
 
-  // 4. Fetch README (optional)
-  let readmeSnippet = "";
-  try {
-    const readmeRes = await fetch(
-      `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/README.md`
-    );
-    if (readmeRes.ok) {
-      const text = await readmeRes.text();
-      readmeSnippet = text.substring(0, 2000);
+  let manifest = null;
+  const manifestKeys = Object.keys(manifestMap);
+  if (manifestKeys.length === 1 && manifestMap.root) {
+    manifest = manifestMap.root;
+  } else if (manifestKeys.length > 0) {
+    manifest = manifestMap;
+  }
+
+  // 4. Fetch documentation & architecture notes (README, backend_flow.md, architecture docs)
+  const docTargets = new Set(["README.md"]);
+  if (rawPaths.length > 0) {
+    for (const p of rawPaths) {
+      const lower = p.toLowerCase();
+      if (
+        (lower.endsWith(".md") || lower.endsWith(".txt")) &&
+        (lower.includes("flow") ||
+          lower.includes("arch") ||
+          lower.includes("design") ||
+          lower.includes("guide") ||
+          lower.endsWith("readme.md")) &&
+        !lower.includes("node_modules/")
+      ) {
+        docTargets.add(p);
+      }
     }
-  } catch {
-    // README is optional
+  }
+
+  // Fallback doc candidates for monorepos if tree was blocked
+  docTargets.add("backend_flow.md");
+  docTargets.add("frontend_flow.md");
+  docTargets.add("ARCHITECTURE.md");
+  docTargets.add(`${lowerRepo}-frontend/README.md`);
+  docTargets.add(`${lowerRepo}-backend/README.md`);
+  docTargets.add("frontend/README.md");
+  docTargets.add("backend/README.md");
+
+  let accumulatedDocs = "";
+  for (const docFile of docTargets) {
+    if (accumulatedDocs.length >= 3500) break;
+    try {
+      const docRes = await fetch(
+        `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${docFile}`
+      );
+      if (docRes.ok) {
+        let text = await docRes.text();
+        // Clean null bytes and UTF-16 artifacts
+        text = text.replace(/\x00/g, "").trim();
+        // Ignore files that are essentially empty (e.g. just a heading title)
+        if (text.length > 40) {
+          accumulatedDocs += `\n\n--- [DOC: ${docFile}] ---\n` + text.substring(0, 1500);
+        }
+      }
+    } catch {
+      // Doc file is optional
+    }
+  }
+
+  if (isRateLimited) {
+    console.info(
+      "💡 Tip: Set GITHUB_TOKEN in your environment to increase GitHub REST API limits from 60 to 5,000 requests/hour."
+    );
   }
 
   return {
@@ -205,7 +313,7 @@ async function fetchRepoBlueprint(repoUrl) {
     topics: repoData.topics || [],
     manifest,
     fileTree: filteredTree,
-    readmeSnippet,
+    readmeSnippet: accumulatedDocs.trim(),
   };
 }
 

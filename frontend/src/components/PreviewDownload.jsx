@@ -170,6 +170,7 @@ export default function PreviewDownload() {
             pdfUrl: url,
             latex: result.latex,
             adaptationsSummary: result.adaptationsSummary,
+            judgeAudit: result.judgeAudit,
           },
         });
       } else {
@@ -238,12 +239,31 @@ export default function PreviewDownload() {
             borderLeft: '2px solid var(--color-accent)',
           }}
         >
-          <span className="mono-tag" style={{ color: 'var(--color-accent)' }}>
-            [ ADAPTATIONS SUMMARY ]
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.35rem' }}>
+            <span className="mono-tag" style={{ color: 'var(--color-accent)' }}>
+              [ ADAPTATIONS SUMMARY ]
+            </span>
+            {state.judgeAudit && (
+              <span
+                className="mono-tag"
+                style={{
+                  color: state.judgeAudit.passed ? '#10b981' : '#f59e0b',
+                  borderColor: state.judgeAudit.passed ? '#10b981' : '#f59e0b',
+                  fontSize: '0.72rem',
+                }}
+              >
+                [ AI JUDGE: {state.judgeAudit.passed ? `VERIFIED (${state.judgeAudit.score}/100)` : 'REVIEWED'} ]
+              </span>
+            )}
+          </div>
           <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.88rem', color: 'var(--color-text-primary)' }}>
             {state.adaptationsSummary}
           </p>
+          {state.judgeAudit?.auditSummary && (
+            <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.78rem', color: 'var(--color-text-muted)', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.4rem' }}>
+              <strong style={{ color: 'var(--color-text-secondary)' }}>Audit Verdict:</strong> {state.judgeAudit.auditSummary}
+            </p>
+          )}
         </div>
       )}
 

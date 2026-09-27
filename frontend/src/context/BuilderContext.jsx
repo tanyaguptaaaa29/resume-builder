@@ -15,6 +15,7 @@ const initialState = {
   tailoredPdfUrl: null,
   tailoredLatex: null,
   adaptationsSummary: '',
+  judgeAudit: null,
   activeViewMode: 'original', // 'original' | 'tailored'
   isLoading: false,
   loadingMessage: '',
@@ -49,6 +50,7 @@ function builderReducer(state, action) {
         tailoredPdfUrl: action.payload.pdfUrl,
         tailoredLatex: action.payload.latex,
         adaptationsSummary: action.payload.adaptationsSummary || '',
+        judgeAudit: action.payload.judgeAudit || null,
         activeViewMode: 'tailored',
       };
     case 'SET_VIEW_MODE':
@@ -63,6 +65,7 @@ function builderReducer(state, action) {
         tailoredPdfUrl: null,
         tailoredLatex: null,
         adaptationsSummary: '',
+        judgeAudit: null,
         activeViewMode: 'original',
       };
     case 'SET_LOADING':

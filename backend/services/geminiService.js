@@ -271,7 +271,8 @@ async function tailorResumeToJD(
   jobDescription,
   targetRole = "",
   githubContext = [],
-  projectNotes = ""
+  projectNotes = "",
+  judgeFeedback = null
 ) {
   const resumeJson = typeof resumeData === "string" ? resumeData : JSON.stringify(resumeData, null, 2);
 
@@ -289,6 +290,17 @@ AUTHORIZATION: You are explicitly AUTHORIZED to weave in and spotlight these ver
 The candidate provided additional technical context regarding their projects:
 ${projectNotes.trim()}
 You may incorporate these genuine details into relevant bullet points to align with the JD.\n`
+      : "";
+
+  const feedbackSection =
+    judgeFeedback && typeof judgeFeedback === "string" && judgeFeedback.trim().length > 0
+      ? `\n⚠️ CRITICAL CORRECTION REQUIRED FROM LLM-AS-A-JUDGE AUDITOR:
+Your previous attempt was REJECTED due to the following factual violations or hallucinations:
+${judgeFeedback.trim()}
+YOU MUST FIX THESE VIOLATIONS:
+- Remove any unverified tools, libraries, or claims mentioned above.
+- Strictly keep all candidate metrics identical to the original resume.
+- Ensure all content is 100% truthful and interview-defensible.\n`
       : "";
 
   const response = await generateContentWithRetry({
@@ -323,6 +335,7 @@ ${jobDescription}
 ${targetRole ? `\nTARGET ROLE/TITLE:\n${targetRole}` : ""}
 ${githubSection}
 ${notesSection}
+${feedbackSection}
 CANDIDATE CURRENT RESUME JSON:
 ${resumeJson}
 

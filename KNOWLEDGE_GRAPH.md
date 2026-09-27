@@ -31,12 +31,14 @@ graph TD
         subgraph Services["Core Backend Services"]
             PDF_PARSER["pdfParserService.js\n(pdfjs-dist text & link extraction)"]
             GEMINI["geminiService.js\n(@google/genai / gemini-3.5-flash-lite)"]
+            JUDGE["judgeService.js\n(LLM-as-a-Judge Fact Auditor)"]
             LATEX_COMPILER["latexCompilerService.js\n(texlive.net CGI Compiler)"]
             PDF_LIB["pdf-lib Canvas Engine\n(NSUT Logo Stamp & Page Counter)"]
         end
 
         CTRL --> PDF_PARSER
         CTRL --> GEMINI
+        CTRL --> JUDGE
         CTRL --> LATEX_COMPILER
         CTRL --> PDF_LIB
     end

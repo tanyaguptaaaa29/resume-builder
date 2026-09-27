@@ -7,6 +7,7 @@ const {
   tailorResumeToJD,
 } = require("../services/geminiService");
 const { compileLatex } = require("../services/latexCompilerService");
+const { tailorWithJudgeLoop } = require("../services/judgeService");
 const fs = require("fs");
 const path = require("path");
 const { PDFDocument } = require("pdf-lib");
@@ -276,40 +277,18 @@ async function tailorResume(req, res) {
       console.log(`- GitHub Codebase Context: ${githubContext.length} repositories analyzed`);
     }
 
-    const rawResult = await tailorResumeToJD(
+    const {
+      tailoredResume,
+      adaptationsSummary,
+      judgeAudit,
+    } = await tailorWithJudgeLoop(
+      tailorResumeToJD,
       parsedData,
       jobDescription,
       targetRole || "",
       githubContext || [],
       projectNotes || ""
     );
-
-    let cleaned = rawResult.trim();
-    const jsonBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (jsonBlockMatch) {
-      cleaned = jsonBlockMatch[1];
-    } else if (cleaned.startsWith("```")) {
-      cleaned = cleaned.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-    }
-    // Sanitize unescaped backslashes
-    cleaned = cleaned.replace(/(?<!\\)\\(?!["\\/bfnrtu])/g, "\\\\");
-
-    let parsedResult;
-    try {
-      parsedResult = JSON.parse(cleaned);
-    } catch (err) {
-      console.error("JSON Parse Error in tailorResume:", err.message);
-      console.error("Raw LLM output:", rawResult);
-      return res.status(500).json({
-        success: false,
-        error: "Failed to parse tailored resume JSON from AI",
-      });
-    }
-
-    const tailoredResume = parsedResult.tailoredResume || parsedResult;
-    const adaptationsSummary =
-      parsedResult.adaptationsSummary ||
-      "Subtly aligned bullet points and skill priorities with the target job requirements.";
 
     let pdfBase64 = null;
     let latex = null;
@@ -322,11 +301,12 @@ async function tailorResume(req, res) {
       latex = compiled.texContent;
     }
 
-    console.log("✅ Tailor Resume Complete.");
+    console.log("✅ Tailor Resume Complete (Audited by AI Judge).");
     return res.json({
       success: true,
       data: tailoredResume,
       adaptationsSummary,
+      judgeAudit,
       pdfBase64,
       latex,
     });

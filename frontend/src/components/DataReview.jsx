@@ -64,6 +64,7 @@ export default function DataReview() {
               pdfUrl: tUrl,
               latex: tailoredResult.latex,
               adaptationsSummary: tailoredResult.adaptationsSummary,
+              judgeAudit: tailoredResult.judgeAudit,
             },
           });
         }

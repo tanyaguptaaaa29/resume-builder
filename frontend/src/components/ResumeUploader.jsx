@@ -9,14 +9,14 @@ export default function ResumeUploader() {
 
   const handleFile = async (file) => {
     if (file.type !== 'application/pdf') {
-      dispatch({ type: 'SET_ERROR', payload: 'Please upload a PDF file.' });
+      dispatch({ type: 'SET_ERROR', payload: 'Please upload a valid PDF document.' });
       return;
     }
 
     setFileName(file.name);
     dispatch({
       type: 'SET_LOADING',
-      payload: { isLoading: true, message: 'Extracting and optimizing data for ATS via AI...' },
+      payload: { isLoading: true, message: 'Parsing PDF text stream and structuring JSON schema entities...' },
     });
     dispatch({ type: 'SET_ERROR', payload: null });
 
@@ -29,26 +29,29 @@ export default function ResumeUploader() {
         dispatch({ type: 'SET_LOADING', payload: { isLoading: false } });
         dispatch({
           type: 'SET_ERROR',
-          payload: result.error || 'Failed to extract data.',
+          payload: result.error || 'Failed to extract data from document.',
         });
       }
     } catch (err) {
       dispatch({ type: 'SET_LOADING', payload: { isLoading: false } });
       dispatch({
         type: 'SET_ERROR',
-        payload: err.response?.data?.error || 'Server error. Please ensure backend is running.',
+        payload: err.response?.data?.error || 'Server connection error. Ensure the backend daemon is operational.',
       });
     }
   };
 
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      <h2 style={{ textAlign: 'center', marginBottom: '0.75rem' }}>
-        Upload Your <span className="text-gradient">Resume</span>
-      </h2>
-      <p style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-        Drop your PDF resume below and our AI will extract your information.
-      </p>
+      <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+        <span className="mono-tag">DOCUMENT INGESTION</span>
+        <h2 style={{ marginTop: '0.4rem', marginBottom: '0.4rem' }}>
+          Upload Source Resume
+        </h2>
+        <p>
+          Single or multi-page PDF documents are parsed in-memory without persistent database storage.
+        </p>
+      </div>
 
       <div
         className="upload-zone"
@@ -61,11 +64,23 @@ export default function ResumeUploader() {
           onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
           style={{ display: 'none' }}
         />
-        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>
-          {fileName ? '✅' : '📄'}
+        
+        <div style={{ 
+          fontFamily: 'var(--font-mono)', 
+          fontSize: '0.8rem', 
+          color: 'var(--color-accent)',
+          marginBottom: '1rem'
+        }}>
+          {fileName ? '[ FILE DETECTED ]' : '[ DRAG & DROP OR CLICK TO BROWSE ]'}
         </div>
-        <h4>{fileName || 'Drop your resume here'}</h4>
-        <p>{fileName ? 'File ready — processing...' : 'PDF only, max 5MB'}</p>
+
+        <h4 style={{ marginBottom: '0.4rem' }}>
+          {fileName || 'Select PDF Document'}
+        </h4>
+        
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+          {fileName ? 'Processing binary stream...' : 'Format: PDF / Maximum size: 5MB'}
+        </p>
       </div>
     </div>
   );

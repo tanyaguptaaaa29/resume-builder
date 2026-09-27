@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBuilder } from '../context/BuilderContext';
 import { tailorResumeApi, analyzeGithubApi } from '../services/api';
+import SkeletonLoader from './SkeletonLoader';
 
 export default function PreviewDownload() {
   const { state, dispatch } = useBuilder();
@@ -100,20 +101,20 @@ export default function PreviewDownload() {
     }));
 
     try {
-      const res = await analyzeGithubApi(url.trim());
-      if (res.success && res.analysis) {
+      const result = await analyzeGithubApi(url.trim());
+      if (result.success && result.analysis) {
         setGithubAnalyses((prev) => ({
           ...prev,
           [idx]: {
             ...(prev[idx] || {}),
             repoUrl: url,
             isAnalyzing: false,
-            analysis: res.analysis,
+            analysis: result.analysis,
             error: null,
           },
         }));
       } else {
-        throw new Error(res.error || "Failed to inspect repository");
+        throw new Error(result.error || 'Failed to inspect repository');
       }
     } catch (err) {
       setGithubAnalyses((prev) => ({
@@ -131,20 +132,18 @@ export default function PreviewDownload() {
   const handleTailorSubmit = async (e) => {
     e.preventDefault();
     if (!state.jobDescription || state.jobDescription.trim().length < 20) {
-      setTailorError("Please enter a job description of at least 20 characters.");
+      setTailorError('Please enter a job description of at least 20 characters.');
       return;
     }
-
     setTailorError(null);
     setIsTailoring(true);
 
-    // Collect verified GitHub codebase analyses
     const githubContext = Object.values(githubAnalyses)
       .filter((item) => item && item.analysis)
       .map((item) => item.analysis);
 
     try {
-      const response = await tailorResumeApi({
+      const result = await tailorResumeApi({
         data: state.resumeData,
         jobDescription: state.jobDescription,
         targetRole: state.targetRole,
@@ -154,9 +153,8 @@ export default function PreviewDownload() {
         compile: true,
       });
 
-      if (response.success && response.pdfBase64) {
-        // Convert Base64 to Blob URL
-        const binaryString = window.atob(response.pdfBase64);
+      if (result.success && result.pdfBase64) {
+        const binaryString = window.atob(result.pdfBase64);
         const len = binaryString.length;
         const bytes = new Uint8Array(len);
         for (let i = 0; i < len; i++) {
@@ -168,18 +166,20 @@ export default function PreviewDownload() {
         dispatch({
           type: 'SET_TAILORED_RESULT',
           payload: {
-            data: response.data,
+            data: result.data,
             pdfUrl: url,
-            latex: response.latex,
-            adaptationsSummary: response.adaptationsSummary,
+            latex: result.latex,
+            adaptationsSummary: result.adaptationsSummary,
           },
         });
       } else {
-        throw new Error(response.error || "Failed to tailor resume to job description.");
+        throw new Error(result.error || 'Failed to tailor resume to job description.');
       }
     } catch (err) {
-      console.error("Tailor error:", err);
-      setTailorError(err.response?.data?.error || err.message || "Failed to tailor resume.");
+      console.error('Tailor error:', err);
+      setTailorError(
+        err.response?.data?.error || err.message || 'Failed to tailor resume.'
+      );
     } finally {
       setIsTailoring(false);
     }
@@ -195,12 +195,15 @@ export default function PreviewDownload() {
 
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', maxWidth: '980px' }}>
-      <h2 style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
-        Your Resume is <span className="text-gradient">Ready</span>! 🎉
-      </h2>
-      <p style={{ textAlign: 'center', marginBottom: '1.75rem', color: 'var(--color-text-secondary)' }}>
-        Preview your compiled ATS-perfect resume below and tailor it for target job descriptions.
-      </p>
+      <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
+        <span className="mono-tag">STEP 04: OUTPUT VERIFICATION</span>
+        <h2 style={{ marginTop: '0.4rem', marginBottom: '0.4rem' }}>
+          Resume Compilation Artifacts
+        </h2>
+        <p>
+          Inspect the compiled vector PDF and optionally align technical points with specific job descriptions.
+        </p>
+      </div>
 
       {/* Mode Switcher Pill (if tailored version exists) */}
       {state.tailoredPdfUrl && (
@@ -211,14 +214,14 @@ export default function PreviewDownload() {
               className={`mode-toggle-btn ${state.activeViewMode === 'original' ? 'active' : ''}`}
               onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'original' })}
             >
-              📄 Baseline Resume
+              [ Standard Compilation ]
             </button>
             <button
               type="button"
               className={`mode-toggle-btn ${state.activeViewMode === 'tailored' ? 'active' : ''}`}
               onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'tailored' })}
             >
-              🎯 Tailored for Job <span className="badge-pulse">ATS Match</span>
+              [ Calibrated for Target JD ] <span className="badge-pulse">ATS Match</span>
             </button>
           </div>
         </div>
@@ -227,32 +230,32 @@ export default function PreviewDownload() {
       {/* Active Adaptation Summary Banner */}
       {isTailoredActive && state.adaptationsSummary && (
         <div 
-          className="adaptations-card glass-card"
+          className="solid-panel"
           style={{
             width: '100%',
             marginBottom: '1.5rem',
             padding: '1rem 1.25rem',
-            background: 'linear-gradient(135deg, rgba(52, 211, 153, 0.1) 0%, rgba(129, 140, 248, 0.05) 100%)',
-            borderColor: 'rgba(52, 211, 153, 0.3)',
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '0.75rem',
+            borderLeft: '2px solid var(--color-accent)',
           }}
         >
-          <span style={{ fontSize: '1.25rem', lineHeight: '1' }}>⚡</span>
-          <div>
-            <strong style={{ color: 'var(--color-success)', fontSize: '0.9rem', display: 'block', marginBottom: '0.2rem' }}>
-              Tailored Adaptations Summary:
-            </strong>
-            <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--color-text-primary)' }}>
-              {state.adaptationsSummary}
-            </p>
-          </div>
+          <span className="mono-tag" style={{ color: 'var(--color-accent)' }}>
+            [ ADAPTATIONS SUMMARY ]
+          </span>
+          <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.88rem', color: 'var(--color-text-primary)' }}>
+            {state.adaptationsSummary}
+          </p>
+        </div>
+      )}
+
+      {/* Tailoring In-Progress Skeleton Loader State */}
+      {isTailoring && (
+        <div style={{ width: '100%', marginBottom: '2rem' }}>
+          <SkeletonLoader message="Calibrating bullet points and compiling tailored LaTeX output..." />
         </div>
       )}
 
       {/* PDF Preview Iframe */}
-      {activePdfUrl && (
+      {!isTailoring && activePdfUrl && (
         <div className="pdf-viewer" style={{ marginBottom: '2rem', width: '100%' }}>
           <iframe src={activePdfUrl} title="Resume Preview" />
         </div>
@@ -264,9 +267,8 @@ export default function PreviewDownload() {
           className="btn btn-primary btn-xl" 
           onClick={handleDownload}
           disabled={isDownloading || !activePdfUrl}
-          style={{ cursor: isDownloading ? 'wait' : 'pointer' }}
         >
-          {isDownloading ? '⏳ Downloading...' : `⬇️ Download ${isTailoredActive ? 'Tailored' : 'Baseline'} PDF`}
+          {isDownloading ? '[ Executing Download... ]' : `[ Download ${isTailoredActive ? 'Tailored' : 'Standard'} PDF ]`}
         </button>
         
         <button 
@@ -274,7 +276,7 @@ export default function PreviewDownload() {
           onClick={handleDownloadLatex}
           disabled={!activeLatex}
         >
-          📝 Download LaTeX Code
+          [ Download LaTeX Source (.tex) ]
         </button>
 
         <button 
@@ -282,153 +284,121 @@ export default function PreviewDownload() {
           onClick={handleCopyLatex}
           disabled={!activeLatex}
         >
-          {isCopied ? '✅ Copied!' : '📋 Copy LaTeX Code'}
+          {isCopied ? '[ LaTeX Copied to Clipboard ]' : '[ Copy LaTeX Source ]'}
         </button>
       </div>
 
-      {/* ========================================================= */}
-      {/* 🎯 The Job Description & GitHub Codebase Studio on the Last Page */}
-      {/* ========================================================= */}
+      {/* Target Job Description Studio */}
       <div 
-        className="glass-card jd-studio-card"
+        className="solid-panel jd-studio-card"
         style={{
           width: '100%',
           padding: '2rem',
           marginBottom: '2.5rem',
-          background: 'linear-gradient(135deg, rgba(129, 140, 248, 0.07) 0%, rgba(99, 102, 241, 0.02) 100%)',
-          borderColor: 'rgba(129, 140, 248, 0.25)',
-          position: 'relative',
-          overflow: 'hidden',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem' }}>
-              <span style={{ fontSize: '1.5rem' }}>🎯</span>
-              <h3 style={{ margin: 0, fontSize: '1.35rem', color: 'var(--color-text-primary)' }}>
-                Tailor for a Specific <span className="text-gradient">Job Description</span>
-              </h3>
-            </div>
-            <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--color-text-secondary)', maxWidth: '680px' }}>
-              Paste a target job description below. Optionally connect your public GitHub repositories to let AI discover genuine architectural features you actually built (even without a detailed README).
+            <span className="mono-tag">[ POST-PROCESSING PIPELINE ]</span>
+            <h3 style={{ margin: '0.3rem 0 0.35rem 0', fontSize: '1.3rem' }}>
+              Job Description Calibration Studio
+            </h3>
+            <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--color-text-secondary)', maxWidth: '680px' }}>
+              Paste target job requirements below. Optionally inspect public GitHub repositories to extract architectural traits matching the role.
             </p>
           </div>
 
           {state.tailoredPdfUrl && (
             <button
               type="button"
-              className="btn btn-ghost"
-              style={{ fontSize: '0.85rem' }}
+              className="btn btn-secondary"
+              style={{ fontSize: '0.8rem', fontFamily: 'var(--font-mono)' }}
               onClick={() => dispatch({ type: 'RESET_TAILORED' })}
             >
-              🔄 Clear Tailored Version
+              [ Clear Tailored Output ]
             </button>
           )}
         </div>
 
         <form onSubmit={handleTailorSubmit}>
           <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: '0.4rem' }}>
-              Target Job Title / Company (Optional)
+            <label style={{ display: 'block', fontSize: '0.82rem', color: 'var(--color-text-muted)', marginBottom: '0.35rem' }}>
+              Target Job Title / Organization (Optional)
             </label>
             <input
               type="text"
-              placeholder="e.g. Full Stack Software Engineer @ Stripe"
+              placeholder="e.g. Distributed Systems Engineer at Stripe"
               value={state.targetRole || ''}
               onChange={(e) => dispatch({ type: 'SET_TARGET_ROLE', payload: e.target.value })}
-              style={{
-                width: '100%',
-                padding: '0.75rem 1rem',
-                borderRadius: 'var(--radius-md)',
-                background: 'rgba(0, 0, 0, 0.35)',
-                border: '1px solid var(--color-border)',
-                color: 'var(--color-text-primary)',
-                fontSize: '0.95rem',
-              }}
+              className="input"
             />
           </div>
 
           <div style={{ marginBottom: '1.25rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+              <label style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
                 Target Job Description / Requirements
               </label>
-              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+              <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)' }}>
                 {(state.jobDescription || '').length} characters
               </span>
             </div>
             <textarea
               rows={5}
-              placeholder="Paste the target job description, core duties, and tech requirements here..."
+              placeholder="Paste the target job qualifications, tech stack requirements, and responsibilities here..."
               value={state.jobDescription || ''}
               onChange={(e) => dispatch({ type: 'SET_JOB_DESCRIPTION', payload: e.target.value })}
-              style={{
-                width: '100%',
-                padding: '0.85rem 1rem',
-                borderRadius: 'var(--radius-md)',
-                background: 'rgba(0, 0, 0, 0.35)',
-                border: '1px solid var(--color-border)',
-                color: 'var(--color-text-primary)',
-                fontSize: '0.9rem',
-                resize: 'vertical',
-                fontFamily: 'inherit',
-                lineHeight: '1.45',
-              }}
+              className="input"
+              style={{ resize: 'vertical', lineHeight: '1.5' }}
             />
           </div>
 
-          {/* ========================================================= */}
-          {/* 📂 GitHub Codebase Inspection Accordion (Optional)        */}
-          {/* ========================================================= */}
+          {/* GitHub Codebase Context Accordion (Optional) */}
           <div 
             style={{
               marginBottom: '1.5rem',
               padding: '1rem',
-              borderRadius: 'var(--radius-lg)',
-              background: 'rgba(255, 255, 255, 0.02)',
+              background: 'var(--color-bg-tertiary)',
               border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-sm)',
             }}
           >
             <div 
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
               onClick={() => setShowProjectContext(!showProjectContext)}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <span style={{ fontSize: '1.2rem' }}>🐙</span>
-                <div>
-                  <strong style={{ fontSize: '0.95rem', color: 'var(--color-text-primary)' }}>
-                    Deepen Project Context from GitHub
-                  </strong>
-                  <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                    (Optional — No tokens needed for public repos)
+              <div>
+                <strong style={{ fontSize: '0.9rem', color: 'var(--color-text-primary)' }}>
+                  Deepen Project Context from GitHub Repositories
+                </strong>
+                <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>
+                  (Optional: No access token required for public repos)
+                </span>
+                {inspectedCount > 0 && (
+                  <span 
+                    style={{
+                      marginLeft: '0.5rem',
+                      fontSize: '0.72rem',
+                      padding: '0.15rem 0.45rem',
+                      fontFamily: 'var(--font-mono)',
+                      background: 'var(--color-success-bg)',
+                      color: 'var(--color-success)',
+                    }}
+                  >
+                    [{inspectedCount} Codebase{inspectedCount > 1 ? 's' : ''} Inspected]
                   </span>
-                  {inspectedCount > 0 && (
-                    <span 
-                      style={{
-                        marginLeft: '0.5rem',
-                        fontSize: '0.75rem',
-                        padding: '0.15rem 0.5rem',
-                        borderRadius: '9999px',
-                        background: 'rgba(52, 211, 153, 0.2)',
-                        color: 'var(--color-success)',
-                        fontWeight: 600,
-                      }}
-                    >
-                      ✓ {inspectedCount} Codebase{inspectedCount > 1 ? 's' : ''} Inspected
-                    </span>
-                  )}
-                </div>
+                )}
               </div>
 
-              <button type="button" className="btn btn-ghost" style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}>
-                {showProjectContext ? 'Hide ▲' : 'Inspect Repos ▼'}
+              <button type="button" className="btn btn-ghost" style={{ fontSize: '0.78rem', padding: '0.2rem 0.5rem', fontFamily: 'var(--font-mono)' }}>
+                {showProjectContext ? '[ Hide Inspector ]' : '[ Open Repo Inspector ]'}
               </button>
             </div>
 
             {showProjectContext && (
               <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
                 <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginBottom: '1rem' }}>
-                  Even if your repository has an empty README, our AI reads your package manifests, Dockerfiles, and directory structure to surface genuine real-world tools that match the JD.
+                  The engine reads package manifests and project structure to surface genuine technical dependencies matching the job description.
                 </p>
 
                 {state.resumeData?.projects?.map((proj, idx) => {
@@ -437,20 +407,20 @@ export default function PreviewDownload() {
                     <div 
                       key={idx}
                       style={{
-                        padding: '0.85rem',
+                        padding: '0.75rem',
                         marginBottom: '0.75rem',
-                        borderRadius: 'var(--radius-md)',
-                        background: 'rgba(0, 0, 0, 0.25)',
+                        background: 'var(--color-bg-secondary)',
                         border: '1px solid var(--color-border)',
+                        borderRadius: 'var(--radius-sm)'
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                        <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--color-text-primary)' }}>
-                          🚀 {proj.name}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                        <span style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--color-text-primary)' }}>
+                          Project: {proj.name}
                         </span>
                         {item.analysis && (
-                          <span style={{ fontSize: '0.75rem', color: 'var(--color-success)', fontWeight: 600 }}>
-                            ✓ Codebase Verified
+                          <span style={{ fontSize: '0.72rem', color: 'var(--color-success)', fontFamily: 'var(--font-mono)' }}>
+                            [ Codebase Verified ]
                           </span>
                         )}
                       </div>
@@ -467,61 +437,37 @@ export default function PreviewDownload() {
                               [idx]: { ...(prev[idx] || {}), repoUrl: val },
                             }));
                           }}
-                          style={{
-                            flex: 1,
-                            minWidth: '220px',
-                            padding: '0.5rem 0.75rem',
-                            borderRadius: 'var(--radius-md)',
-                            background: 'rgba(0, 0, 0, 0.3)',
-                            border: '1px solid var(--color-border)',
-                            color: 'var(--color-text-primary)',
-                            fontSize: '0.85rem',
-                          }}
+                          className="input"
+                          style={{ flex: 1, minWidth: '220px', padding: '0.45rem 0.65rem', fontSize: '0.82rem' }}
                         />
                         <button
                           type="button"
                           className="btn btn-secondary"
                           onClick={() => handleInspectRepo(idx, item.repoUrl)}
                           disabled={item.isAnalyzing || !item.repoUrl || !item.repoUrl.trim()}
-                          style={{ fontSize: '0.8rem', padding: '0.5rem 0.9rem' }}
+                          style={{ fontSize: '0.78rem', padding: '0.45rem 0.75rem', fontFamily: 'var(--font-mono)' }}
                         >
-                          {item.isAnalyzing ? (
-                            <>
-                              <span className="spinner-sm" style={{ marginRight: '0.4rem' }} />
-                              Scanning Codebase...
-                            </>
-                          ) : item.analysis ? (
-                            '🔄 Re-Inspect'
-                          ) : (
-                            '🔍 Inspect Codebase'
-                          )}
+                          {item.isAnalyzing ? '[ Scanning Tree... ]' : item.analysis ? '[ Re-Inspect ]' : '[ Inspect Repository ]'}
                         </button>
                       </div>
 
                       {item.error && (
-                        <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.78rem', color: 'var(--color-error)' }}>
-                          ⚠️ {item.error}
+                        <p style={{ margin: '0.4rem 0 0 0', fontSize: '0.75rem', color: 'var(--color-error)', fontFamily: 'var(--font-mono)' }}>
+                          [ ERROR ] {item.error}
                         </p>
                       )}
 
                       {/* Display Detected Capabilities */}
                       {item.analysis && (
-                        <div style={{ marginTop: '0.75rem', paddingTop: '0.6rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                          <p style={{ margin: '0 0 0.35rem 0', fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
-                            <strong>Detected Architecture:</strong> {item.analysis.summary}
+                        <div style={{ marginTop: '0.6rem', paddingTop: '0.5rem', borderTop: '1px solid var(--color-border)' }}>
+                          <p style={{ margin: '0 0 0.3rem 0', fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>
+                            <strong>Architecture Detected:</strong> {item.analysis.summary}
                           </p>
-                          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
                             {item.analysis.techStack?.slice(0, 10).map((tech, tIdx) => (
                               <span 
                                 key={tIdx}
-                                style={{
-                                  fontSize: '0.72rem',
-                                  padding: '0.15rem 0.45rem',
-                                  borderRadius: '4px',
-                                  background: 'rgba(129, 140, 248, 0.15)',
-                                  color: 'var(--color-accent)',
-                                  border: '1px solid rgba(129, 140, 248, 0.3)',
-                                }}
+                                className="badge-outline"
                               >
                                 {tech}
                               </span>
@@ -535,24 +481,16 @@ export default function PreviewDownload() {
 
                 {/* Additional Freeform Notes Box for Non-GitHub work */}
                 <div style={{ marginTop: '1rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginBottom: '0.35rem' }}>
-                    📝 Extra Project Details / Hidden Features (For private repos or unlinked work):
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '0.35rem' }}>
+                    Supplemental Project Details (Optional: for private repositories or unlinked implementations)
                   </label>
                   <textarea
                     rows={3}
-                    placeholder="e.g. In my payment service, I also configured Redis rate limiting, Docker Compose, and automated GitHub Actions CI tests..."
+                    placeholder="e.g. Configured distributed caching via Redis, rate limiting algorithms, and Kubernetes deployments..."
                     value={projectNotes}
                     onChange={(e) => setProjectNotes(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.65rem 0.85rem',
-                      borderRadius: 'var(--radius-md)',
-                      background: 'rgba(0, 0, 0, 0.3)',
-                      border: '1px solid var(--color-border)',
-                      color: 'var(--color-text-primary)',
-                      fontSize: '0.85rem',
-                      fontFamily: 'inherit',
-                    }}
+                    className="input"
+                    style={{ fontSize: '0.82rem' }}
                   />
                 </div>
               </div>
@@ -565,13 +503,13 @@ export default function PreviewDownload() {
                 marginBottom: '1rem',
                 padding: '0.75rem 1rem',
                 background: 'var(--color-error-bg)',
-                border: '1px solid rgba(248, 113, 113, 0.3)',
-                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--color-error)',
+                borderRadius: 'var(--radius-sm)',
                 color: 'var(--color-error)',
                 fontSize: '0.85rem',
               }}
             >
-              {tailorError}
+              [ ERROR ] {tailorError}
             </div>
           )}
 
@@ -580,22 +518,19 @@ export default function PreviewDownload() {
               type="submit"
               className="btn btn-primary btn-lg"
               disabled={isTailoring || !(state.jobDescription && state.jobDescription.trim().length >= 20)}
-              style={{ minWidth: '260px' }}
+              style={{ minWidth: '240px' }}
             >
               {isTailoring ? (
-                <>
-                  <span className="spinner-sm" style={{ marginRight: '0.5rem' }} />
-                  Synthesizing & Compiling...
-                </>
+                '[ Compiling Tailored Version... ]'
               ) : state.tailoredPdfUrl ? (
-                '✨ Re-tailor with Updated JD'
+                '[ Re-calibrate with Updated JD ]'
               ) : (
-                '✨ Reframe & Align with JD'
+                '[ Align & Recompile for JD ]'
               )}
             </button>
 
-            <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-              🔒 <strong>Grounded Guarantee:</strong> Only reframes phrasing; never exaggerates or hallucinates facts.
+            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>
+              FIDELITY GUARANTEE: Phrasing is adjusted to match JD keywords without generating unearned experience.
             </span>
           </div>
         </form>
@@ -603,8 +538,8 @@ export default function PreviewDownload() {
 
       {/* Start Over Button */}
       <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <button className="btn btn-ghost btn-lg" onClick={handleStartOver}>
-          🔄 Start Over
+        <button className="btn btn-ghost" onClick={handleStartOver} style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>
+          [ Reset Session & Return Home ]
         </button>
       </div>
     </div>

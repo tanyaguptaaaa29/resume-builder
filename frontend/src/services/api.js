@@ -14,7 +14,7 @@ export async function parseResumeApi(file) {
   const formData = new FormData();
   formData.append('file', file);
 
-  // Don't set Content-Type manually — axios auto-detects FormData
+  // Do not set Content-Type manually: axios auto-detects FormData
   // and sets 'multipart/form-data' with the correct boundary.
   const response = await api.post('/parse-resume', formData);
   return response.data;

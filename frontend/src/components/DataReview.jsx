@@ -12,13 +12,13 @@ export default function DataReview() {
   const handleGenerate = async () => {
     dispatch({
       type: 'SET_LOADING',
-      payload: { isLoading: true, message: 'Generating LaTeX & compiling baseline PDF...' },
+      payload: { isLoading: true, message: 'Compiling LaTeX source and generating PDF artifact...' },
     });
 
     try {
       const result = await generateLatexApi(state.resumeData, state.template);
       if (!result.success) {
-        throw new Error(result.error || 'Failed to generate PDF.');
+        throw new Error(result.error || 'Failed to generate PDF document.');
       }
 
       const binaryString = window.atob(result.pdfBase64);
@@ -37,7 +37,7 @@ export default function DataReview() {
       if (state.jobDescription && state.jobDescription.trim().length >= 20) {
         dispatch({
           type: 'SET_LOADING',
-          payload: { isLoading: true, message: 'Tailoring resume to your target JD...' },
+          payload: { isLoading: true, message: 'Calibrating resume points against target job description...' },
         });
 
         const tailoredResult = await tailorResumeApi({
@@ -75,7 +75,7 @@ export default function DataReview() {
       dispatch({ type: 'SET_LOADING', payload: { isLoading: false } });
       dispatch({
         type: 'SET_ERROR',
-        payload: err.response?.data?.error || err.message || 'Failed to generate PDF.',
+        payload: err.response?.data?.error || err.message || 'Failed to compile PDF document.',
       });
     }
   };
@@ -83,7 +83,7 @@ export default function DataReview() {
   const handleEnhance = async (section) => {
     dispatch({
       type: 'SET_LOADING',
-      payload: { isLoading: true, message: `Enhancing ${section} via Gemini...` },
+      payload: { isLoading: true, message: `Refining ${section} phrasing via Gemini model...` },
     });
 
     try {
@@ -99,97 +99,77 @@ export default function DataReview() {
 
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      <h2 style={{ textAlign: 'center', marginBottom: '0.75rem' }}>
-        Review Your <span className="text-gradient">Information</span>
-      </h2>
-      <p style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-        Make sure everything looks good before we compile your resume.
-      </p>
+      <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+        <span className="mono-tag">STEP 03: VERIFICATION</span>
+        <h2 style={{ marginTop: '0.4rem', marginBottom: '0.4rem' }}>
+          Review Ingested Schema
+        </h2>
+        <p>
+          Verify extracted fields and section assignments prior to executing pdfLaTeX compilation.
+        </p>
+      </div>
 
-      {/* Target Job Description Teaser & Optional Early Entry */}
+      {/* Target Job Description Optional Box */}
       <div 
-        className="glass-card" 
+        className="solid-panel" 
         style={{ 
           width: '100%', 
           maxWidth: '1000px', 
-          marginBottom: '1.5rem', 
-          background: 'linear-gradient(135deg, rgba(129, 140, 248, 0.08) 0%, rgba(99, 102, 241, 0.03) 100%)',
-          borderColor: 'rgba(129, 140, 248, 0.25)',
+          marginBottom: '2rem', 
           padding: '1.25rem 1.5rem'
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-            <span style={{ fontSize: '1.75rem' }}>🎯</span>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <h4 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--color-text-primary)' }}>
-                  Targeting a Specific Job Description?
-                </h4>
-                <span className="badge-new" style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', borderRadius: '12px', background: 'var(--gradient-primary)', color: '#fff', fontWeight: 600 }}>NEW</span>
-              </div>
-              <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-                You can fine-tune and align your points on the final preview page, or paste your target JD here to generate a tailored version right away.
-              </p>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span className="mono-tag">[ OPTIONAL CALIBRATION ]</span>
+              <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--color-text-primary)' }}>
+                Target Job Description
+              </h4>
             </div>
+            <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
+              Paste target job requirements now, or fine-tune phrasing on the final output page.
+            </p>
           </div>
           <button
             type="button"
             className="btn btn-secondary"
-            style={{ fontSize: '0.85rem', padding: '0.45rem 0.9rem' }}
+            style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem', fontFamily: 'var(--font-mono)' }}
             onClick={() => setShowJdInput(!showJdInput)}
           >
-            {showJdInput ? 'Hide JD Box ▲' : '+ Target a Job (Optional) ▼'}
+            {showJdInput ? '[ Hide JD Panel ]' : '[ + Attach Job Description ]'}
           </button>
         </div>
 
         {showJdInput && (
-          <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
-            <div style={{ marginBottom: '0.75rem' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '0.25rem' }}>
-                Target Role / Title (Optional)
+          <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid var(--color-border)' }}>
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '0.35rem' }}>
+                Target Role / Title
               </label>
               <input
                 type="text"
-                placeholder="e.g. SDE-1, Full Stack Developer, Frontend Engineer"
+                placeholder="e.g. Systems Software Engineer, Backend Infrastructure"
                 value={state.targetRole || ''}
                 onChange={(e) => dispatch({ type: 'SET_TARGET_ROLE', payload: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '0.6rem 0.8rem',
-                  borderRadius: 'var(--radius-md)',
-                  background: 'rgba(0, 0, 0, 0.35)',
-                  border: '1px solid var(--color-border)',
-                  color: 'var(--color-text-primary)',
-                  fontSize: '0.9rem',
-                }}
+                className="input"
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '0.25rem' }}>
-                Paste Job Description / Key Requirements
+              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '0.35rem' }}>
+                Job Description Requirements
               </label>
               <textarea
                 rows={4}
-                placeholder="Paste the target job description or requirements here..."
+                placeholder="Paste the target job description or core qualifications here..."
                 value={state.jobDescription || ''}
                 onChange={(e) => dispatch({ type: 'SET_JOB_DESCRIPTION', payload: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: 'var(--radius-md)',
-                  background: 'rgba(0, 0, 0, 0.35)',
-                  border: '1px solid var(--color-border)',
-                  color: 'var(--color-text-primary)',
-                  fontSize: '0.85rem',
-                  resize: 'vertical',
-                  fontFamily: 'inherit',
-                  lineHeight: '1.4',
-                }}
+                className="input"
+                style={{ resize: 'vertical', lineHeight: '1.5' }}
               />
             </div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', margin: '0.5rem 0 0 0' }}>
-              💡 <em>Our AI will subtly align your bullet points and highlight relevant skills without inventing unearned experience or exaggerating metrics.</em>
+            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', margin: '0.5rem 0 0 0', fontFamily: 'var(--font-mono)' }}>
+              NOTE: Algorithmic alignment prioritizes genuine candidate experience without synthesizing unverified claims.
             </p>
           </div>
         )}
@@ -197,56 +177,71 @@ export default function DataReview() {
 
       <div className="review-grid">
         {/* Personal Info */}
-        <div className="glass-card">
-          <h4 style={{ color: 'var(--color-accent)', marginBottom: '1rem' }}>👤 Personal Info</h4>
-          <p><strong>Name:</strong> {data.personalInfo.fullName}</p>
+        <div className="solid-panel">
+          <div className="mono-tag" style={{ marginBottom: '0.5rem' }}>[ SECTION 01 ]</div>
+          <h4 style={{ marginBottom: '0.75rem' }}>Personal Information</h4>
+          <p><strong>Name:</strong> {data.personalInfo.fullName || data.personalInfo.name}</p>
           <p><strong>Email:</strong> {data.personalInfo.email}</p>
-          <p><strong>Phone:</strong> {data.personalInfo.phone}</p>
+          <p><strong>Phone:</strong> {data.personalInfo.phone || 'N/A'}</p>
           {data.personalInfo.linkedin && <p><strong>LinkedIn:</strong> {data.personalInfo.linkedin}</p>}
           {data.personalInfo.github && <p><strong>GitHub:</strong> {data.personalInfo.github}</p>}
         </div>
 
         {/* Education */}
-        <div className="glass-card">
-          <h4 style={{ color: 'var(--color-accent)', marginBottom: '1rem' }}>🎓 Education</h4>
+        <div className="solid-panel">
+          <div className="mono-tag" style={{ marginBottom: '0.5rem' }}>[ SECTION 02 ]</div>
+          <h4 style={{ marginBottom: '0.75rem' }}>Education & Academics</h4>
           {data.education.map((edu, i) => (
-            <div key={i} style={{ marginBottom: '0.75rem' }}>
-              <p><strong>{edu.institution}</strong></p>
-              <p style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)' }}>
-                {edu.degree} ({edu.field}) {edu.cgpa ? `| CGPA: ${edu.cgpa}` : ''}
+            <div key={i} style={{ marginBottom: '0.75rem', borderBottom: i < data.education.length - 1 ? '1px solid var(--color-border)' : 'none', paddingBottom: '0.5rem' }}>
+              <p><strong>{edu.institution || edu.school}</strong></p>
+              <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
+                {edu.degree} ({edu.field || edu.major}) {edu.cgpa || edu.gpa ? `| CGPA: ${edu.cgpa || edu.gpa}` : ''}
               </p>
             </div>
           ))}
         </div>
 
         {/* Skills */}
-        <div className="glass-card">
-          <h4 style={{ color: 'var(--color-accent)', marginBottom: '1rem' }}>🛠 Technical Skills</h4>
+        <div className="solid-panel">
+          <div className="mono-tag" style={{ marginBottom: '0.5rem' }}>[ SECTION 03 ]</div>
+          <h4 style={{ marginBottom: '0.75rem' }}>Technical Competencies</h4>
           {data.skills?.map((skill, i) => (
             skill.category && skill.items && (
-              <p key={i}><strong>{skill.category}:</strong> {skill.items}</p>
+              <p key={i} style={{ marginBottom: '0.35rem', fontSize: '0.88rem' }}>
+                <strong>{skill.category}:</strong> {skill.items}
+              </p>
             )
           ))}
         </div>
 
         {/* Projects */}
         {data.projects?.length > 0 && (
-          <div className="glass-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h4 style={{ color: 'var(--color-accent)' }}>🚀 Projects</h4>
-              <button className="btn btn-ghost" style={{ fontSize: '0.8rem' }} onClick={() => handleEnhance('projects')}>
-                ✨ Enhance
+          <div className="solid-panel">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <div>
+                <div className="mono-tag">[ SECTION 04 ]</div>
+                <h4 style={{ margin: '0.2rem 0 0 0' }}>Projects</h4>
+              </div>
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem', fontFamily: 'var(--font-mono)' }} 
+                onClick={() => handleEnhance('projects')}
+              >
+                [ Refine via Gemini ]
               </button>
             </div>
             {data.projects.map((proj, i) => (
-              <div key={i} style={{ marginBottom: '0.75rem' }}>
+              <div key={i} style={{ marginBottom: '0.85rem', borderBottom: i < data.projects.length - 1 ? '1px solid var(--color-border)' : 'none', paddingBottom: '0.5rem' }}>
                 <p>
                   <strong>{proj.name}</strong> ({proj.techStack?.join(', ')})
-                  {proj.link && <span style={{ marginLeft: '0.5rem' }}><a href={proj.link} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)' }}>[Source]</a></span>}
-                  {proj.liveLink && <span style={{ marginLeft: '0.5rem' }}><a href={proj.liveLink} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)' }}>[Live]</a></span>}
+                  {proj.link && <span style={{ marginLeft: '0.5rem' }}><a href={proj.link} target="_blank" rel="noreferrer">[Source]</a></span>}
+                  {proj.liveLink && <span style={{ marginLeft: '0.5rem' }}><a href={proj.liveLink} target="_blank" rel="noreferrer">[Deployment]</a></span>}
                 </p>
                 {proj.bullets?.map((b, j) => (
-                  <p key={j} style={{ fontSize: '0.85rem', paddingLeft: '0.5rem' }}>• {b}</p>
+                  <p key={j} style={{ fontSize: '0.82rem', paddingLeft: '0.5rem', color: 'var(--color-text-secondary)', margin: '0.2rem 0' }}>
+                    - {b}
+                  </p>
                 ))}
               </div>
             ))}
@@ -255,18 +250,28 @@ export default function DataReview() {
 
         {/* Experience */}
         {data.experience?.length > 0 && (
-          <div className="glass-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h4 style={{ color: 'var(--color-accent)' }}>💼 Experience</h4>
-              <button className="btn btn-ghost" style={{ fontSize: '0.8rem' }} onClick={() => handleEnhance('experience')}>
-                ✨ Enhance
+          <div className="solid-panel">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <div>
+                <div className="mono-tag">[ SECTION 05 ]</div>
+                <h4 style={{ margin: '0.2rem 0 0 0' }}>Work Experience</h4>
+              </div>
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem', fontFamily: 'var(--font-mono)' }} 
+                onClick={() => handleEnhance('experience')}
+              >
+                [ Refine via Gemini ]
               </button>
             </div>
             {data.experience.map((exp, i) => (
-              <div key={i} style={{ marginBottom: '0.75rem' }}>
-                <p><strong>{exp.role}</strong> @ {exp.company}</p>
+              <div key={i} style={{ marginBottom: '0.85rem', borderBottom: i < data.experience.length - 1 ? '1px solid var(--color-border)' : 'none', paddingBottom: '0.5rem' }}>
+                <p><strong>{exp.role || exp.position}</strong> @ {exp.company}</p>
                 {exp.bullets?.map((b, j) => (
-                  <p key={j} style={{ fontSize: '0.85rem', paddingLeft: '0.5rem' }}>• {b}</p>
+                  <p key={j} style={{ fontSize: '0.82rem', paddingLeft: '0.5rem', color: 'var(--color-text-secondary)', margin: '0.2rem 0' }}>
+                    - {b}
+                  </p>
                 ))}
               </div>
             ))}
@@ -279,9 +284,8 @@ export default function DataReview() {
           className="btn btn-primary btn-xl" 
           onClick={handleGenerate}
           disabled={state.isLoading}
-          style={{ cursor: state.isLoading ? 'wait' : 'pointer' }}
         >
-          {state.isLoading ? '⏳ Generating...' : '📄 Generate & Compile Resume'}
+          {state.isLoading ? '[ Executing Compilation... ]' : '[ Compile LaTeX Document ]'}
         </button>
       </div>
     </div>

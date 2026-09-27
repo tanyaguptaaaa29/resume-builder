@@ -133,48 +133,53 @@ export default function ManualForm() {
   };
 
   const tabs = [
-    { id: "personal", label: "Personal Info", icon: "👤" },
-    { id: "education", label: "Education", icon: "🎓" },
-    { id: "experience", label: "Experience", icon: "💼" },
-    { id: "projects", label: "Projects", icon: "🚀" },
-    { id: "skills", label: "Skills", icon: "🛠" },
+    { id: "personal", label: "Personal Information", tag: "01" },
+    { id: "education", label: "Education & Academics", tag: "02" },
+    { id: "experience", label: "Work Experience", tag: "03" },
+    { id: "projects", label: "Technical Projects", tag: "04" },
+    { id: "skills", label: "Skills & Core Competencies", tag: "05" },
   ];
 
   return (
-    <div className="animate-fade-in-up manual-form-container" style={{ width: "100%", maxWidth: "900px", margin: "0 auto" }}>
+    <div className="manual-form-container" style={{ width: "100%", maxWidth: "900px", margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-        <h2 className="builder-step-title" style={{ marginBottom: 0, textAlign: "left" }}>
-          Fill Your <span className="text-gradient">Details</span>
-        </h2>
-        <button type="button" onClick={handleClearForm} className="btn btn-ghost" style={{ color: "var(--color-error)", fontSize: "0.85rem", padding: "0.4rem 0.8rem" }}>
-          🗑 Clear Form
+        <div>
+          <span className="mono-tag">STEP 03: SCHEMA ENTRY</span>
+          <h2 style={{ marginBottom: 0, marginTop: "0.25rem", textAlign: "left" }}>
+            Candidate Information
+          </h2>
+        </div>
+        <button type="button" onClick={handleClearForm} className="btn btn-ghost" style={{ color: "var(--color-error)", fontSize: "0.82rem", padding: "0.35rem 0.75rem", fontFamily: "var(--font-mono)" }}>
+          [ Clear Form State ]
         </button>
       </div>
-      <p className="builder-step-subtitle" style={{ textAlign: "left", marginBottom: "2rem" }}>
-        All data is auto-saved locally. Education and Projects are required.
+      <p style={{ textAlign: "left", marginBottom: "1.75rem", color: "var(--color-text-secondary)" }}>
+        All fields are preserved locally in browser session storage. Education and Projects are required.
       </p>
 
-      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: "0.4rem", marginBottom: "1.75rem", flexWrap: "wrap" }}>
         {tabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id)}
             style={{
-              padding: "0.75rem 1.25rem",
-              background: activeTab === tab.id ? "var(--color-accent-light)" : "var(--color-bg-glass)",
-              color: activeTab === tab.id ? "var(--color-accent)" : "var(--color-text-primary)",
-              border: `1px solid ${activeTab === tab.id ? "var(--color-border-accent)" : "var(--color-border)"}`,
-              borderRadius: "var(--radius-full)",
+              padding: "0.5rem 0.9rem",
+              background: activeTab === tab.id ? "var(--color-accent)" : "var(--color-bg-secondary)",
+              color: activeTab === tab.id ? "#141619" : "var(--color-text-secondary)",
+              border: `1px solid ${activeTab === tab.id ? "var(--color-accent)" : "var(--color-border)"}`,
+              borderRadius: "var(--radius-sm)",
               cursor: "pointer",
               fontWeight: activeTab === tab.id ? 600 : 400,
+              fontFamily: "var(--font-mono)",
+              fontSize: "0.78rem",
               display: "flex",
               alignItems: "center",
-              gap: "0.5rem",
-              transition: "all var(--transition-fast)"
+              gap: "0.4rem",
+              transition: "background-color var(--transition-fast), color var(--transition-fast)",
             }}
           >
-            <span>{tab.icon}</span>
+            <span>[{tab.tag}]</span>
             <span>{tab.label}</span>
           </button>
         ))}
@@ -384,7 +389,7 @@ export default function ManualForm() {
 
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "2rem", borderTop: "1px solid var(--color-border)", paddingTop: "1.5rem" }}>
           <button type="submit" className="btn btn-primary btn-lg">
-            Review and Generate ✨
+            [ Proceed to Data Review & Compilation ]
           </button>
         </div>
       </form>

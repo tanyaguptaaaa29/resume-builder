@@ -4,36 +4,7 @@
  * and metric inflation in AI-generated resumes.
  */
 
-const { GoogleGenAI } = require("@google/genai");
-
-const ai = new GoogleGenAI({
-  apiKey: process.env.GOOGLE_API_KEY || "",
-});
-
-/**
- * Resilient wrapper around Gemini generateContent with retry for rate limits
- */
-async function generateJudgeContentWithRetry(params, maxRetries = 3) {
-  let attempt = 0;
-  while (attempt < maxRetries) {
-    try {
-      return await ai.models.generateContent(params);
-    } catch (err) {
-      attempt++;
-      const isTransient =
-        err.status === 503 ||
-        err.status === 429 ||
-        (err.message && (err.message.includes("503") || err.message.includes("429") || err.message.includes("high demand")));
-      if (isTransient && attempt < maxRetries) {
-        const delayMs = attempt * 1500;
-        console.warn(`⚠️ [LLM-Judge] Gemini API transient error (${err.status || 503}). Retrying in ${delayMs / 1000}s...`);
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-      } else {
-        throw err;
-      }
-    }
-  }
-}
+const { generateContentWithRetry } = require("./geminiService");
 
 /**
  * LLM-as-a-Judge: Audits tailored resume output against the original candidate data,
@@ -99,7 +70,7 @@ Return ONLY valid JSON matching this schema:
   "auditSummary": "1-2 sentence assessment of fidelity, metric retention, and interview defensibility."
 }`;
 
-    const response = await generateJudgeContentWithRetry({
+    const response = await generateContentWithRetry({
       model: "gemini-3.5-flash-lite",
       contents: prompt,
       config: {

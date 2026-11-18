@@ -3,36 +3,7 @@
  * Fetches public GitHub repository trees and manifests to discover genuine capabilities without requiring authentication.
  */
 
-const { GoogleGenAI } = require("@google/genai");
-
-const ai = new GoogleGenAI({
-  apiKey: process.env.GOOGLE_API_KEY || "",
-});
-
-/**
- * Resilient wrapper around Gemini generateContent
- */
-async function generateContentWithRetry(params, maxRetries = 3) {
-  let attempt = 0;
-  while (attempt < maxRetries) {
-    try {
-      return await ai.models.generateContent(params);
-    } catch (err) {
-      attempt++;
-      const isTransient =
-        err.status === 503 ||
-        err.status === 429 ||
-        (err.message && (err.message.includes("503") || err.message.includes("429") || err.message.includes("high demand")));
-      if (isTransient && attempt < maxRetries) {
-        const delayMs = attempt * 1500;
-        console.warn(`⚠️ Gemini API transient error (${err.status || 503}). Retrying in ${delayMs / 1000}s...`);
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-      } else {
-        throw err;
-      }
-    }
-  }
-}
+const { generateContentWithRetry } = require("./geminiService");
 
 /**
  * Parses any GitHub URL into { owner, repo }

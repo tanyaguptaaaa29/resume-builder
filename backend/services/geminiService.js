@@ -7,29 +7,79 @@ const ai = new GoogleGenAI({
   apiKey: process.env.GOOGLE_API_KEY || "",
 });
 
+const DEFAULT_PRIMARY_MODEL = process.env.GEMINI_PRIMARY_MODEL || "gemini-3.5-flash-lite";
+const DEFAULT_FALLBACK_MODELS = process.env.GEMINI_FALLBACK_MODELS
+  ? process.env.GEMINI_FALLBACK_MODELS.split(",").map((m) => m.trim()).filter(Boolean)
+  : ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite", "gemma-4-31b-it"];
+
 /**
- * Resilient wrapper around Gemini generateContent with exponential backoff for transient 503/429 spikes
+ * Resilient multi-tier wrapper around Gemini generateContent with automatic model fallback cascade
+ * Handles 503 high demand / 429 rate limit spikes with exponential backoff & randomized jitter.
  */
-async function generateContentWithRetry(params, maxRetries = 3) {
-  let attempt = 0;
-  while (attempt < maxRetries) {
-    try {
-      return await ai.models.generateContent(params);
-    } catch (err) {
-      attempt++;
-      const isTransient =
-        err.status === 503 ||
-        err.status === 429 ||
-        (err.message && (err.message.includes("503") || err.message.includes("429") || err.message.includes("high demand")));
-      if (isTransient && attempt < maxRetries) {
-        const delayMs = attempt * 1500;
-        console.warn(`⚠️ Gemini API transient error (${err.status || 503}). Retrying in ${delayMs / 1000}s (Attempt ${attempt}/${maxRetries})...`);
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-      } else {
-        throw err;
+async function generateContentWithRetry(params, options = {}) {
+  const maxRetriesPerModel = typeof options === "number" ? options : (options.maxRetriesPerModel || 2);
+  const initialModel = params.model || DEFAULT_PRIMARY_MODEL;
+  
+  // Build deduplicated candidate model cascade starting with the requested model, followed by the rest of the pool
+  const candidateModels = [
+    initialModel,
+    ...DEFAULT_FALLBACK_MODELS.filter((m) => m !== initialModel),
+  ];
+  
+  let lastError = null;
+
+  for (let mIdx = 0; mIdx < candidateModels.length; mIdx++) {
+    const currentModel = candidateModels[mIdx];
+    const nextModel = candidateModels[mIdx + 1];
+
+    for (let attempt = 1; attempt <= maxRetriesPerModel; attempt++) {
+      try {
+        const response = await ai.models.generateContent({
+          ...params,
+          model: currentModel,
+        });
+        if (mIdx > 0) {
+          console.log(`✅ [Gemini Fallback] Request succeeded using fallback model: "${currentModel}"`);
+        }
+        return response;
+      } catch (err) {
+        lastError = err;
+        const errMsg = err.message || "";
+        const isTransient =
+          err.status === 503 ||
+          err.status === 429 ||
+          errMsg.includes("503") ||
+          errMsg.includes("429") ||
+          errMsg.includes("high demand") ||
+          errMsg.includes("UNAVAILABLE") ||
+          errMsg.includes("RESOURCE_EXHAUSTED") ||
+          errMsg.includes("fetch failed") ||
+          errMsg.includes("socket hang up");
+
+        // Non-transient errors (e.g. 400 Bad Request, schema/syntax error) fail immediately
+        if (!isTransient) {
+          throw err;
+        }
+
+        if (attempt < maxRetriesPerModel) {
+          const jitter = Math.floor(Math.random() * 500);
+          const delayMs = attempt * 1200 + jitter;
+          console.warn(
+            `⚠️ [Gemini] Transient error on "${currentModel}" (${err.status || 503}). Retrying in ${(delayMs / 1000).toFixed(1)}s (Attempt ${attempt}/${maxRetriesPerModel})...`
+          );
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
       }
     }
+
+    if (nextModel) {
+      console.warn(
+        `➡️ [Gemini Fallback] Model "${currentModel}" unavailable after ${maxRetriesPerModel} attempts (503/transient). Cascading to fallback model "${nextModel}"...`
+      );
+    }
   }
+
+  throw lastError;
 }
 
 /**
@@ -363,4 +413,8 @@ module.exports = {
   enhanceContent,
   truncateLatex,
   tailorResumeToJD,
+  generateContentWithRetry,
+  ai,
+  DEFAULT_PRIMARY_MODEL,
+  DEFAULT_FALLBACK_MODELS,
 };

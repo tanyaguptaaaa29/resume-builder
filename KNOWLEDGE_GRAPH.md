@@ -30,7 +30,7 @@ graph TD
         
         subgraph Services["Core Backend Services"]
             PDF_PARSER["pdfParserService.js\n(pdfjs-dist text & link extraction)"]
-            GEMINI["geminiService.js\n(@google/genai / gemini-3.5-flash-lite)"]
+            GEMINI["geminiService.js\n(@google/genai / Multi-Tier Cascade:\ngemini-3.5-flash-lite → gemini-3.8-flash → gemini-3.6-flash → gemini-3.1-flash-lite → gemma-4-31b-it)"]
             JUDGE["judgeService.js\n(LLM-as-a-Judge Fact Auditor)"]
             LATEX_COMPILER["latexCompilerService.js\n(texlive.net CGI Compiler)"]
             PDF_LIB["pdf-lib Canvas Engine\n(NSUT Logo Stamp & Page Counter)"]
@@ -44,7 +44,7 @@ graph TD
     end
 
     subgraph External["External Services & APIs"]
-        GEMINI_API["Google Gemini AI API\n(gemini-3.5-flash-lite)"]
+        GEMINI_API["Google Gemini AI API\n(Multi-Model Cascade with 503 Failover)"]
         TEXLIVE_API["TeXLive Online CGI\n(https://texlive.net/cgi-bin/latexcgi)"]
         RENDER["Render Cloud Hosting\n(resume-builder-9j6w.onrender.com)"]
     end
@@ -306,7 +306,7 @@ stateDiagram-v2
 | `backend/app.js` | Express Server Entry | Express 4, `cors()`, `express.json({ limit: "10mb" })`, `express.urlencoded({ limit: "10mb" })`. Route prefix: `/api`. Global error handler. Port default: `5000`. |
 | `backend/routes/resumeRoutes.js` | Express Router | Multer memory storage (`5MB` limit). Routes: `POST /parse-resume`, `POST /generate-latex`, `POST /enhance`, `POST /tailor-resume`, `POST /analyze-github`. |
 | `backend/controllers/resumeController.js` | Business Logic Controller | Coordinates parsing, sanitizing LLM output, shared `compileAndStampResume` loop with single-page guarantee and NSUT logo stamp, `tailorResume`, and `analyzeGithub` handler. |
-| `backend/services/geminiService.js` | Google GenAI SDK Interface | Uses `@google/genai` (v0.1+ syntax). Model: `gemini-3.5-flash-lite`. Handlers: `extractResumeData`, `generateLatex`, `enhanceContent`, `truncateLatex`, `tailorResumeToJD` with verified codebase context. |
+| `backend/services/geminiService.js` | Google GenAI SDK Interface | Uses `@google/genai` (v0.1+ syntax). Model Cascade: Primary `gemini-3.5-flash-lite`, Fallbacks: `gemini-3.8-flash`, `gemini-3.6-flash`, `gemini-3.1-flash-lite`, `gemma-4-31b-it`. Resilient against 503 high demand / 429 rate limit spikes with jittered backoff. Handlers: `extractResumeData`, `generateLatex`, `enhanceContent`, `truncateLatex`, `tailorResumeToJD` with verified codebase context. |
 | `backend/services/githubService.js` | GitHub Codebase Inspector | Fetches recursive git trees, manifests (`package.json`, `requirements.txt`), and analyzes real architecture using Gemini without requiring auth tokens for public repositories. |
 | `backend/services/pdfParserService.js` | PDF Extraction Engine | Uses dynamic import of `pdfjs-dist/legacy/build/pdf.mjs` for Node.js compatibility. Reconstructs text lines using vertical coordinate tracking (`yMin`). Extracts embedded hyperlink annotations. |
 | `backend/services/latexCompilerService.js` | Remote LaTeX Compiler | Sends multipart form data (`filecontents[]`, `filename[]`, `engine=pdflatex`, `return=pdf`) to `https://texlive.net/cgi-bin/latexcgi`. Timeout: 60s. On failure, dumps `last_failed.tex` and `last_failed.log` to disk. |
